@@ -112,7 +112,7 @@ class StatsPage extends StatelessWidget {
                     icon: const Icon(Icons.download),
                     label: const Text("Import JSON"),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.emerald.withOpacity(0.3),
+                      backgroundColor: const Color(0xFF10B981).withOpacity(0.3),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
                   ),

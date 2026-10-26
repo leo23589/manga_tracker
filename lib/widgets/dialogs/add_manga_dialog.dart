@@ -109,7 +109,7 @@ void showAddMangaDialog({
                           },
                         );
                       },
-                      icon: const Icon(Icons.public_search, size: 18),
+                      icon: const Icon(Icons.travel_explore, size: 18),
                       label: const Text("Autofill from MangaDex"),
                     ),
                     const SizedBox(height: 12),

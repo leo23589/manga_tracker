@@ -42,7 +42,7 @@ class MangaApp extends StatelessWidget {
               primaryContainer: const Color(0xFF1E1E2A),
             ),
             scaffoldBackgroundColor: const Color(0xFF0F0F14),
-            cardTheme: CardTheme(
+            cardTheme: CardThemeData(
               color: const Color(0xFF1A1A24),
               elevation: 4,
               shadowColor: Colors.black.withOpacity(0.5),

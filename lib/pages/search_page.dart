@@ -288,7 +288,7 @@ class _SearchPageState extends State<SearchPage> {
                 onSubmitted: (_) => _performMangaDexSearch(),
                 decoration: InputDecoration(
                   hintText: "Search MangaDex online...",
-                  prefixIcon: const Icon(Icons.public_search),
+                  prefixIcon: const Icon(Icons.travel_explore),
                   suffixIcon: IconButton(
                     icon: const Icon(Icons.search),
                     onPressed: _performMangaDexSearch,
