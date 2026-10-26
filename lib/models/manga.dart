@@ -72,9 +72,9 @@ class Manga extends ChangeNotifier {
       title: map['title'],
       currentChapter: map['currentChapter'],
       imagePath: map['imagePath'],
-      synopsis: map['synopsis'],
-      themes: List<String>.from(map['themes']),
-      rating: map['rating'],
+      synopsis: map['synopsis'] ?? '',
+      themes: List<String>.from(map['themes'] ?? <String>[]),
+      rating: map['rating'] ?? 0,
       createdAt: DateTime.parse(map['createdAt']),
       lastUpdated: DateTime.parse(map['lastUpdated']),
     );
@@ -127,7 +127,7 @@ class MangaCollectionData extends ChangeNotifier {
   List<Manga> _mangas = <Manga>[];
 
   MangaCollectionData() {
-    _loadData(); // Charger les données dès la création
+    _loadData();
   }
 
   MangaSortOption get sortOption => _sortOption;
@@ -177,7 +177,6 @@ class MangaCollectionData extends ChangeNotifier {
         final List<dynamic> jsonList = jsonDecode(jsonString);
         _mangas = jsonList.map((m) => Manga.fromMap(m)).toList();
         
-        // Ajouter des listeners pour sauvegarder si un manga individuel change
         for (var manga in _mangas) {
           manga.addListener(_saveData);
         }
@@ -202,13 +201,38 @@ class MangaCollectionData extends ChangeNotifier {
     }
   }
 
-  // Importer depuis un JSON externe
+  // Importer depuis un JSON externe (avec extraction des images Base64)
   Future<bool> importData(String jsonString) async {
     try {
       final List<dynamic> jsonList = jsonDecode(jsonString);
-      final List<Manga> newMangas = jsonList.map((m) => Manga.fromMap(m)).toList();
-      
-      // Nettoyer les anciens listeners
+      final Directory appDir = await getApplicationDocumentsDirectory();
+
+      final List<Manga> newMangas = <Manga>[];
+
+      for (final dynamic item in jsonList) {
+        if (item is! Map<String, dynamic>) continue;
+
+        String? restoredImagePath = item['imagePath'] as String?;
+        final String? imageBase64 = item['imageBase64'] as String?;
+
+        if (imageBase64 != null && imageBase64.isNotEmpty) {
+          try {
+            final List<int> bytes = base64Decode(imageBase64);
+            final String fileName = 'imported_cover_${DateTime.now().millisecondsSinceEpoch}_${newMangas.length}.jpg';
+            final File file = File('${appDir.path}/$fileName');
+            await file.writeAsBytes(bytes);
+            restoredImagePath = file.path;
+          } catch (e) {
+            debugPrint('Failed to decode imported image: $e');
+          }
+        }
+
+        final Map<String, dynamic> mangaMap = Map<String, dynamic>.from(item);
+        mangaMap['imagePath'] = restoredImagePath;
+
+        newMangas.add(Manga.fromMap(mangaMap));
+      }
+
       for (var manga in _mangas) {
         manga.removeListener(_saveData);
       }
@@ -227,15 +251,34 @@ class MangaCollectionData extends ChangeNotifier {
     }
   }
 
-  // Récupérer le contenu JSON actuel pour l'export
+  // Récupérer le contenu JSON actuel pour l'export (inclut les images en Base64)
   Future<String> getExportJson() async {
-    return jsonEncode(_mangas.map((m) => m.toMap()).toList());
+    final List<Map<String, dynamic>> exportList = <Map<String, dynamic>>[];
+
+    for (final Manga manga in _mangas) {
+      final Map<String, dynamic> map = manga.toMap();
+
+      if (manga.imagePath != null && manga.imagePath!.isNotEmpty) {
+        if (File(manga.imagePath!).existsSync()) {
+          try {
+            final List<int> bytes = await File(manga.imagePath!).readAsBytes();
+            map['imageBase64'] = base64Encode(bytes);
+          } catch (e) {
+            debugPrint('Failed to encode image to base64: $e');
+          }
+        }
+      }
+
+      exportList.add(map);
+    }
+
+    return jsonEncode(exportList);
   }
 
   void addManga(Manga manga) {
     _mangas.add(manga);
-    manga.addListener(_saveData); // Sauvegarder quand ce manga change
-    _saveData(); // Sauvegarder la liste
+    manga.addListener(_saveData);
+    _saveData();
     notifyListeners();
   }
 

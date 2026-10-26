@@ -76,16 +76,19 @@ void showMangaDexDetailModal({
                     return ElevatedButton.icon(
                       onPressed: added
                           ? null
-                          : () {
-                              collection.addManga(result.toManga());
+                          : () async {
+                              final Manga manga = await result.toMangaWithLocalCover();
+                              collection.addManga(manga);
                               setModalState(() {});
                               onStateUpdated();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Added "${result.title}" to your library!'),
-                                  backgroundColor: Colors.green,
-                                ),
-                              );
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Added "${result.title}" to your library!'),
+                                    backgroundColor: Colors.green,
+                                  ),
+                                );
+                              }
                             },
                       icon: Icon(added ? Icons.check : Icons.library_add),
                       label: Text(added ? "In Your Library" : "Add to My Library"),

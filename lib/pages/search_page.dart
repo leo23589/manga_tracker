@@ -28,6 +28,7 @@ class _SearchPageState extends State<SearchPage> {
   List<MangaDexSearchResult> _mangadexResults = <MangaDexSearchResult>[];
   bool _isLoadingMangaDex = false;
   bool _hasSearchedMangaDex = false;
+  bool _isOfflineError = false;
 
   @override
   void dispose() {
@@ -45,16 +46,71 @@ class _SearchPageState extends State<SearchPage> {
     setState(() {
       _isLoadingMangaDex = true;
       _hasSearchedMangaDex = true;
+      _isOfflineError = false;
     });
 
-    final List<MangaDexSearchResult> results = await MangaDexService.searchManga(query);
+    try {
+      final List<MangaDexSearchResult> results = await MangaDexService.searchManga(query);
 
-    if (mounted) {
-      setState(() {
-        _mangadexResults = results;
-        _isLoadingMangaDex = false;
-      });
+      if (mounted) {
+        setState(() {
+          _mangadexResults = results;
+          _isLoadingMangaDex = false;
+          _isOfflineError = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _mangadexResults = <MangaDexSearchResult>[];
+          _isLoadingMangaDex = false;
+          _isOfflineError = true;
+        });
+      }
     }
+  }
+
+  Widget _buildOfflineErrorWidget() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Image.asset(
+              'assets/images/no_connection.png',
+              width: 180,
+              height: 180,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) {
+                return const Icon(Icons.wifi_off, size: 80, color: Colors.redAccent);
+              },
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              "no connection",
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Colors.redAccent,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              "Unable to reach MangaDex. Please check your internet connection.",
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white70),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: _performMangaDexSearch,
+              icon: const Icon(Icons.refresh),
+              label: const Text("Retry"),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -226,30 +282,32 @@ class _SearchPageState extends State<SearchPage> {
                         ],
                       ),
                     )
-                  : !_hasSearchedMangaDex
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.travel_explore, size: 64, color: Colors.grey.shade600),
-                              const SizedBox(height: 12),
-                              const Text("Search for titles on MangaDex to import them!"),
-                            ],
-                          ),
-                        )
-                      : _mangadexResults.isEmpty
-                          ? const Center(child: Text("No results found on MangaDex."))
-                          : ListView.builder(
-                              padding: const EdgeInsets.all(10),
-                              itemCount: _mangadexResults.length,
-                              itemBuilder: (BuildContext context, int index) {
-                                return MangaDexResultTile(
-                                  result: _mangadexResults[index],
-                                  collection: mangaCollection,
-                                  onStateUpdated: () => setState(() {}),
-                                );
-                              },
-                            ),
+                  : _isOfflineError
+                      ? _buildOfflineErrorWidget()
+                      : !_hasSearchedMangaDex
+                          ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.travel_explore, size: 64, color: Colors.grey.shade600),
+                                  const SizedBox(height: 12),
+                                  const Text("Search for titles on MangaDex to import them!"),
+                                ],
+                              ),
+                            )
+                          : _mangadexResults.isEmpty
+                              ? const Center(child: Text("No results found on MangaDex."))
+                              : ListView.builder(
+                                  padding: const EdgeInsets.all(10),
+                                  itemCount: _mangadexResults.length,
+                                  itemBuilder: (BuildContext context, int index) {
+                                    return MangaDexResultTile(
+                                      result: _mangadexResults[index],
+                                      collection: mangaCollection,
+                                      onStateUpdated: () => setState(() {}),
+                                    );
+                                  },
+                                ),
             ),
           ],
         ],

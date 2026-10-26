@@ -1,6 +1,8 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
 import '../models/manga.dart';
 import '../core/constants.dart';
 
@@ -29,10 +31,46 @@ class MangaDexSearchResult {
       rating: 0,
     );
   }
+
+  Future<Manga> toMangaWithLocalCover() async {
+    final String? localPath = await MangaDexService.downloadCoverImageLocally(coverUrl);
+    return Manga(
+      title: title,
+      synopsis: synopsis,
+      imagePath: localPath ?? coverUrl,
+      themes: tags,
+      currentChapter: 1,
+      rating: 0,
+    );
+  }
 }
 
 class MangaDexService {
   static const String _baseUrl = 'https://api.mangadex.org';
+
+  /// Downloads a remote cover image URL to local storage so it works 100% offline.
+  static Future<String?> downloadCoverImageLocally(String? imageUrl) async {
+    if (imageUrl == null || imageUrl.isEmpty) return null;
+    if (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://')) {
+      return imageUrl; // Already a local path
+    }
+
+    try {
+      final http.Response response = await http.get(Uri.parse(imageUrl)).timeout(
+        const Duration(seconds: 10),
+      );
+      if (response.statusCode == 200) {
+        final Directory appDir = await getApplicationDocumentsDirectory();
+        final String fileName = 'cover_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        final File localFile = File('${appDir.path}/$fileName');
+        await localFile.writeAsBytes(response.bodyBytes);
+        return localFile.path;
+      }
+    } catch (e) {
+      debugPrint('Error downloading cover image locally: $e');
+    }
+    return imageUrl; // Fallback to URL if download fails
+  }
 
   /// Searches MangaDex for manga matching [query].
   static Future<List<MangaDexSearchResult>> searchManga(String query) async {
@@ -133,7 +171,6 @@ class MangaDexService {
                 if (tagNameObj is Map) {
                   final String? tagName = tagNameObj['en'] as String?;
                   if (tagName != null) {
-                    // Try to match or normalize tag to existing AppConstants tags
                     final String matchedTag = _matchAppTag(tagName);
                     if (!extractedTags.contains(matchedTag)) {
                       extractedTags.add(matchedTag);
@@ -172,12 +209,11 @@ class MangaDexService {
       return results;
     } catch (e) {
       debugPrint('Error searching MangaDex: $e');
-      return <MangaDexSearchResult>[];
+      rethrow; // Rethrow so caller can detect network/connection errors
     }
   }
 
   static String _matchAppTag(String apiTag) {
-    // Check if directly in genres, themes, or content (case-insensitive)
     for (final String g in AppConstants.genres) {
       if (g.toLowerCase() == apiTag.toLowerCase()) return g;
     }
@@ -187,7 +223,6 @@ class MangaDexService {
     for (final String c in AppConstants.content) {
       if (c.toLowerCase() == apiTag.toLowerCase()) return c;
     }
-    // Return formatted api tag if not in predefined list
     return apiTag;
   }
 }

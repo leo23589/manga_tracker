@@ -74,15 +74,18 @@ class MangaDexResultTile extends StatelessWidget {
                     ElevatedButton.icon(
                       onPressed: isAlreadyInLibrary
                           ? null
-                          : () {
-                              collection.addManga(result.toManga());
+                          : () async {
+                              final Manga manga = await result.toMangaWithLocalCover();
+                              collection.addManga(manga);
                               onStateUpdated();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Added "${result.title}" to your library!'),
-                                  backgroundColor: Colors.green,
-                                ),
-                              );
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Added "${result.title}" to your library!'),
+                                    backgroundColor: Colors.green,
+                                  ),
+                                );
+                              }
                             },
                       icon: Icon(isAlreadyInLibrary ? Icons.check : Icons.library_add, size: 16),
                       label: Text(
