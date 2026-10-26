@@ -1,4 +1,11 @@
-const DEFAULT_SITES = ["mangadex.org", "manganato.com", "readmanga.app", "mangakakalot.com"];
+const DEFAULT_SITES = [
+  "mangadex.org",
+  "manganato.com",
+  "readmanga.app",
+  "mangakakalot.com",
+  "mgeko.cc",
+  "manganami.com"
+];
 
 document.addEventListener("DOMContentLoaded", () => {
   loadSites();
