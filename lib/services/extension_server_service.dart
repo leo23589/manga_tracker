@@ -9,6 +9,8 @@ class PendingMangaUpdate {
   final String rawTitle;
   final String formattedTitle;
   final int chapter;
+  final bool isChapter;
+  final MangaStatus defaultStatus;
   final String? url;
   String? coverUrl;
 
@@ -16,6 +18,8 @@ class PendingMangaUpdate {
     required this.rawTitle,
     required this.formattedTitle,
     required this.chapter,
+    required this.isChapter,
+    required this.defaultStatus,
     this.url,
     this.coverUrl,
   });
@@ -72,6 +76,7 @@ class ExtensionServerService extends ChangeNotifier {
 
             final String? rawTitle = json['title'] as String? ?? json['name'] as String?;
             final dynamic chapterVal = json['chapter'];
+            final bool isChapter = json['isChapter'] as bool? ?? true;
             final String? url = json['url'] as String?;
 
             int chapter = 1;
@@ -82,7 +87,13 @@ class ExtensionServerService extends ChangeNotifier {
             }
 
             if (rawTitle != null && rawTitle.isNotEmpty) {
-              _processChapterUpdate(rawTitle, chapter, url, collection);
+              _processChapterUpdate(
+                rawTitle: rawTitle,
+                chapter: chapter,
+                isChapter: isChapter,
+                url: url,
+                collection: collection,
+              );
 
               request.response
                 ..statusCode = HttpStatus.ok
@@ -143,7 +154,13 @@ class ExtensionServerService extends ChangeNotifier {
     }).join(' ');
   }
 
-  void _processChapterUpdate(String rawTitle, int chapter, String? url, MangaCollectionData collection) {
+  void _processChapterUpdate({
+    required String rawTitle,
+    required int chapter,
+    required bool isChapter,
+    required String? url,
+    required MangaCollectionData collection,
+  }) {
     final String normIncoming = normalizeTitle(rawTitle);
     final String formattedTitle = formatTitleFromSlug(rawTitle);
 
@@ -157,31 +174,50 @@ class ExtensionServerService extends ChangeNotifier {
     }
 
     if (matchedManga != null) {
-      // ONLY update if the incoming chapter is SUPERIOR to current chapter in app!
-      if (chapter > matchedManga.currentChapter) {
-        matchedManga.updateChapter(chapter);
-        _lastNotificationMessage = "Updated '${matchedManga.title}' to Chapter $chapter";
-        NotificationService.showChapterUpdatedNotification(
-          title: matchedManga.title,
-          chapter: chapter,
-        );
+      if (isChapter) {
+        if (chapter > matchedManga.currentChapter) {
+          matchedManga.updateChapter(chapter);
+          if (matchedManga.status == MangaStatus.planToRead) {
+            matchedManga.updateStatus(MangaStatus.reading);
+          }
+          _lastNotificationMessage = "Updated '${matchedManga.title}' to Chapter $chapter";
+          NotificationService.showChapterUpdatedNotification(
+            title: matchedManga.title,
+            chapter: chapter,
+          );
+        } else {
+          _lastNotificationMessage = "'${matchedManga.title}' is already at Chapter ${matchedManga.currentChapter}";
+        }
       } else {
-        _lastNotificationMessage = "'${matchedManga.title}' is already at Chapter ${matchedManga.currentChapter}";
+        _lastNotificationMessage = "'${matchedManga.title}' is already in your library";
       }
       _pendingManga = null;
       notifyListeners();
     } else {
+      final MangaStatus initialStatus = isChapter ? MangaStatus.reading : MangaStatus.planToRead;
+
       _pendingManga = PendingMangaUpdate(
         rawTitle: rawTitle,
         formattedTitle: formattedTitle,
         chapter: chapter,
+        isChapter: isChapter,
+        defaultStatus: initialStatus,
         url: url,
       );
       notifyListeners();
-      NotificationService.showMangaSuggestionNotification(
-        title: formattedTitle,
-        chapter: chapter,
-      );
+
+      if (isChapter) {
+        NotificationService.showMangaSuggestionNotification(
+          title: formattedTitle,
+          chapter: chapter,
+        );
+      } else {
+        NotificationService.showMangaSuggestionNotification(
+          title: "$formattedTitle (Plan to Read)",
+          chapter: 1,
+        );
+      }
+
       _fetchPendingCoverAndEnglishTitle(formattedTitle);
     }
   }
@@ -199,6 +235,8 @@ class ExtensionServerService extends ChangeNotifier {
           rawTitle: _pendingManga!.rawTitle,
           formattedTitle: officialEnglishTitle,
           chapter: _pendingManga!.chapter,
+          isChapter: _pendingManga!.isChapter,
+          defaultStatus: _pendingManga!.defaultStatus,
           url: _pendingManga!.url,
           coverUrl: bestMatch.coverUrl,
         );
@@ -233,11 +271,11 @@ class ExtensionServerService extends ChangeNotifier {
       synopsis: synopsis,
       themes: tags,
       rating: 0,
-      status: MangaStatus.reading,
+      status: pending.defaultStatus,
     );
 
     collection.addManga(newManga);
-    _lastNotificationMessage = "Added '${pending.formattedTitle}' (Ch. ${pending.chapter}) to your library!";
+    _lastNotificationMessage = "Added '${pending.formattedTitle}' (${pending.defaultStatus.label}) to your library!";
     _pendingManga = null;
     notifyListeners();
   }

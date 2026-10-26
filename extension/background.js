@@ -1,6 +1,6 @@
 const DEFAULT_SITES = ["mangadex.org", "manganato.com", "readmanga.app", "mangakakalot.com"];
 
-// List of URL path keywords that are NOT chapter pages
+// List of URL path keywords that are NOT manga pages
 const IGNORED_PATHS = [
   "about", "privacy", "terms", "login", "register", "contact", "faq",
   "search", "user", "profile", "bookmark", "bookmarks", "history", "home",
@@ -10,14 +10,12 @@ const IGNORED_PATHS = [
 // Cache of tab ID -> last visited URL
 const tabUrlMap = new Map();
 
-// Track active tab URL updates
 browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (tab.url) {
     tabUrlMap.set(tabId, tab.url);
   }
 });
 
-// Handle tab close event
 browser.tabs.onRemoved.addListener((tabId, removeInfo) => {
   const url = tabUrlMap.get(tabId);
   tabUrlMap.delete(tabId);
@@ -26,8 +24,6 @@ browser.tabs.onRemoved.addListener((tabId, removeInfo) => {
 
   browser.storage.local.get({ allowedSites: DEFAULT_SITES }).then((result) => {
     const allowedSites = result.allowedSites || DEFAULT_SITES;
-
-    // Check if the closed tab URL matches any allowed site
     const isAllowedSite = allowedSites.some((site) => url.toLowerCase().includes(site.toLowerCase()));
 
     if (isAllowedSite) {
@@ -37,18 +33,19 @@ browser.tabs.onRemoved.addListener((tabId, removeInfo) => {
 });
 
 /**
- * Extracts manga title slug and chapter number from a URL.
- * Only processes URLs that contain explicit chapter indicators (e.g. /chapter-1081).
+ * Parses manga URL.
+ * - If URL contains a chapter indicator (e.g. /chapter-1081) -> sends as Reading chapter update.
+ * - If URL contains a manga title page but no chapter -> sends as Plan to Read.
  */
 function processAndSendMangaData(url) {
   try {
     const parsed = parseMangaUrl(url);
-    if (!parsed || !parsed.title || !parsed.chapter) {
-      console.log("Manga Tracker Sync: Ignored non-chapter URL:", url);
+    if (!parsed || !parsed.title) {
+      console.log("Manga Tracker Sync: Ignored non-manga URL:", url);
       return;
     }
 
-    console.log("Manga Tracker Sync: Sending chapter update to app:", parsed);
+    console.log("Manga Tracker Sync: Sending update to app:", parsed);
 
     fetch("http://127.0.0.1:8080/update", {
       method: "POST",
@@ -58,6 +55,7 @@ function processAndSendMangaData(url) {
       body: JSON.stringify({
         title: parsed.title,
         chapter: parsed.chapter,
+        isChapter: parsed.isChapter,
         url: url
       })
     })
@@ -80,31 +78,26 @@ function parseMangaUrl(urlString) {
     const search = url.search.toLowerCase();
     const fullPath = pathname + search;
 
-    // Filter out root/homepage or static info pages
     const pathParts = pathname.split("/").filter(Boolean);
     if (pathParts.length === 0) return null; // Homepage
     if (pathParts.some((p) => IGNORED_PATHS.includes(p))) return null;
 
-    // MUST contain explicit chapter keyword or parameter
-    // Examples: /chapter-1081, /chapter/1081, /ch-1081, /c1081, ?chapter=1081, /ch/1081
+    // Check if URL contains explicit chapter keyword or parameter
     const chapterMatch = fullPath.match(/(?:chapter|chap|ch|c)[-/_=]?([0-9]+(?:\.[0-9]+)?)/i);
+    const isChapter = !!chapterMatch;
+    let chapterNum = 1;
 
-    if (!chapterMatch) {
-      // URL does not contain "chapter" or chapter identifier -> Ignore!
-      return null;
+    if (chapterMatch) {
+      const parsedNum = parseFloat(chapterMatch[1]);
+      if (!isNaN(parsedNum) && parsedNum > 0) {
+        chapterNum = Math.floor(parsedNum);
+      }
     }
 
-    const chapterNum = parseFloat(chapterMatch[1]);
-    if (isNaN(chapterNum) || chapterNum <= 0) return null;
-
-    // Extract title slug from path parts
-    // E.g. ["manga", "one-piece", "chapter-1081"] -> "one-piece"
+    // Extract title slug
     let titleSlug = "";
-
     for (let i = 0; i < pathParts.length; i++) {
       const part = pathParts[i];
-
-      // Skip generic keywords and chapter parts
       if (["manga", "title", "series", "read", "comic", "chapter", "chap", "ch"].includes(part)) continue;
       if (part.match(/^(?:chapter|chap|ch|c)[-/_]?[0-9]+/i)) continue;
       if (!isNaN(parseFloat(part))) continue;
@@ -113,7 +106,6 @@ function parseMangaUrl(urlString) {
       break;
     }
 
-    // Clean up title slug (e.g. "manga-ab1234" -> "ab1234", "one-piece-manga" -> "one-piece")
     titleSlug = titleSlug
       .replace(/^(manga|read)-/, "")
       .replace(/-(manga|read)$/, "")
@@ -123,7 +115,8 @@ function parseMangaUrl(urlString) {
 
     return {
       title: titleSlug,
-      chapter: Math.floor(chapterNum)
+      chapter: chapterNum,
+      isChapter: isChapter
     };
   } catch (e) {
     return null;
