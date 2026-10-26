@@ -182,15 +182,33 @@ class ExtensionServerService extends ChangeNotifier {
       }
     }
 
-    // 1. Direct Search in Local Collection (by Title OR MangaDex ID)
+    // 1. Direct Search in Local Collection (by MangaDex ID, Source URL, Primary Title, or AltTitles)
     Manga? matchedManga;
     for (final Manga m in collection.mangas) {
       if (incomingMangaDexId != null && m.mangadexId == incomingMangaDexId) {
         matchedManga = m;
         break;
       }
+      if (url != null && url.isNotEmpty) {
+        try {
+          final String host = Uri.parse(url).host.toLowerCase();
+          if (m.sourceUrls.any((s) => s.toLowerCase().contains(host) && normalizeTitle(s).contains(normIncoming))) {
+            matchedManga = m;
+            break;
+          }
+        } catch (_) {}
+      }
+
       final String normLocal = normalizeTitle(m.title);
       if (normLocal == normIncoming || normLocal.contains(normIncoming) || normIncoming.contains(normLocal)) {
+        matchedManga = m;
+        break;
+      }
+
+      if (m.altTitles.any((alt) {
+        final String normAlt = normalizeTitle(alt);
+        return normAlt == normIncoming || normAlt.contains(normIncoming) || normIncoming.contains(normAlt);
+      })) {
         matchedManga = m;
         break;
       }
@@ -213,6 +231,16 @@ class ExtensionServerService extends ChangeNotifier {
             if (normLocal == normOfficial || normLocal.contains(normOfficial) || normOfficial.contains(normLocal)) {
               matchedManga = m;
               m.updateMangaDexId(bestMatch.id);
+              m.updateAltTitles(bestMatch.altTitles);
+              break;
+            }
+            if (m.altTitles.any((alt) {
+              final String normAlt = normalizeTitle(alt);
+              return normAlt == normOfficial || normAlt.contains(normOfficial) || normOfficial.contains(normAlt);
+            })) {
+              matchedManga = m;
+              m.updateMangaDexId(bestMatch.id);
+              m.updateAltTitles(bestMatch.altTitles);
               break;
             }
           }
@@ -222,6 +250,8 @@ class ExtensionServerService extends ChangeNotifier {
 
     // 3. Handle Chapter Update vs Suggestion
     if (matchedManga != null) {
+      if (url != null) matchedManga.addSourceUrl(url);
+
       if (isChapter) {
         if (chapter > matchedManga.currentChapter) {
           matchedManga.updateChapter(chapter);
@@ -307,6 +337,7 @@ class ExtensionServerService extends ChangeNotifier {
     String synopsis = "";
     List<String> tags = <String>["Manga", "Linked"];
     String? mangadexId;
+    List<String> altTitlesList = <String>[];
 
     try {
       final results = await MangaDexService.searchManga(pending.formattedTitle);
@@ -317,6 +348,7 @@ class ExtensionServerService extends ChangeNotifier {
         synopsis = bestMatch.synopsis;
         tags = List<String>.from(bestMatch.tags);
         if (!tags.contains("Linked")) tags.add("Linked");
+        altTitlesList = List<String>.from(bestMatch.altTitles);
       }
     } catch (_) {}
 
@@ -329,6 +361,8 @@ class ExtensionServerService extends ChangeNotifier {
       rating: 0,
       status: pending.defaultStatus,
       mangadexId: mangadexId,
+      altTitles: altTitlesList,
+      sourceUrls: pending.url != null ? <String>[pending.url!] : <String>[],
     );
 
     collection.addManga(newManga);

@@ -12,6 +12,7 @@ class MangaDexSearchResult {
   final String synopsis;
   final String? coverUrl;
   final List<String> tags;
+  final List<String> altTitles;
 
   MangaDexSearchResult({
     required this.id,
@@ -19,6 +20,7 @@ class MangaDexSearchResult {
     required this.synopsis,
     this.coverUrl,
     required this.tags,
+    this.altTitles = const <String>[],
   });
 
   Manga toManga() {
@@ -33,6 +35,8 @@ class MangaDexSearchResult {
       themes: updatedTags,
       currentChapter: 1,
       rating: 0,
+      mangadexId: id,
+      altTitles: altTitles,
     );
   }
 
@@ -49,6 +53,8 @@ class MangaDexSearchResult {
       themes: updatedTags,
       currentChapter: 1,
       rating: 0,
+      mangadexId: id,
+      altTitles: altTitles,
     );
   }
 }
@@ -298,12 +304,30 @@ class MangaDexService {
           extractedTags.insert(0, "Manga");
         }
 
+        final List<String> altTitlesList = <String>[];
+        final dynamic altObj = attributes['altTitles'];
+        if (altObj is List) {
+          for (final dynamic altMap in altObj) {
+            if (altMap is Map) {
+              for (final dynamic val in altMap.values) {
+                if (val != null) {
+                  final String t = val.toString().trim();
+                  if (t.isNotEmpty && t.toLowerCase() != title.toLowerCase() && !altTitlesList.contains(t)) {
+                    altTitlesList.add(t);
+                  }
+                }
+              }
+            }
+          }
+        }
+
         results.add(MangaDexSearchResult(
           id: mangaId,
           title: title,
           synopsis: synopsis,
           coverUrl: coverUrl,
           tags: extractedTags,
+          altTitles: altTitlesList,
         ));
       }
 

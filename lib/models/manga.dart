@@ -53,6 +53,8 @@ class Manga extends ChangeNotifier {
   int rating;
   MangaStatus status;
   String? mangadexId;
+  List<String> altTitles;
+  List<String> sourceUrls;
   
   final DateTime createdAt;
   DateTime lastUpdated;
@@ -66,9 +68,13 @@ class Manga extends ChangeNotifier {
     this.rating = 0,
     this.status = MangaStatus.reading,
     this.mangadexId,
+    List<String>? altTitles,
+    List<String>? sourceUrls,
     DateTime? createdAt,
     DateTime? lastUpdated,
   })  : themes = _sortTags(themes),
+        altTitles = altTitles ?? <String>[],
+        sourceUrls = sourceUrls ?? <String>[],
         createdAt = createdAt ?? DateTime.now(),
         lastUpdated = lastUpdated ?? createdAt ?? DateTime.now();
 
@@ -117,6 +123,8 @@ class Manga extends ChangeNotifier {
       'rating': rating,
       'status': status.label,
       'mangadexId': mangadexId,
+      'altTitles': altTitles,
+      'sourceUrls': sourceUrls,
       'createdAt': createdAt.toIso8601String(),
       'lastUpdated': lastUpdated.toIso8601String(),
     };
@@ -132,6 +140,8 @@ class Manga extends ChangeNotifier {
       rating: map['rating'] ?? 0,
       status: MangaStatusExtension.fromString(map['status']),
       mangadexId: map['mangadexId'],
+      altTitles: List<String>.from(map['altTitles'] ?? <String>[]),
+      sourceUrls: List<String>.from(map['sourceUrls'] ?? <String>[]),
       createdAt: DateTime.parse(map['createdAt']),
       lastUpdated: DateTime.parse(map['lastUpdated']),
     );
@@ -140,6 +150,28 @@ class Manga extends ChangeNotifier {
   void _touch() {
     lastUpdated = DateTime.now();
     notifyListeners();
+  }
+
+  void addSourceUrl(String? url) {
+    if (url == null || url.trim().isEmpty) return;
+    try {
+      final String cleanUrl = url.trim();
+      final Uri uri = Uri.parse(cleanUrl);
+      final String host = uri.host.toLowerCase();
+      if (!sourceUrls.any((s) => s.toLowerCase().contains(host))) {
+        sourceUrls.add(cleanUrl);
+        _touch();
+      }
+    } catch (_) {}
+  }
+
+  void updateAltTitles(List<String> newAltTitles) {
+    final List<String> clean = newAltTitles
+        .map((t) => t.trim())
+        .where((t) => t.isNotEmpty && t.toLowerCase() != title.toLowerCase())
+        .toList();
+    altTitles = List<String>.from(clean);
+    _touch();
   }
 
   void updateMangaDexId(String? id) {

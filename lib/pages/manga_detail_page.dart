@@ -126,6 +126,8 @@ class _MangaDetailPageState extends State<MangaDetailPage> {
           updatedTags.add("Linked");
         }
         manga.updateThemes(updatedTags);
+        manga.updateMangaDexId(result.id);
+        manga.updateAltTitles(result.altTitles);
         if (localPath != null) {
           manga.updateImage(localPath);
         }
@@ -290,6 +292,27 @@ class _MangaDetailPageState extends State<MangaDetailPage> {
                           textAlign: TextAlign.center,
                         ),
                       ),
+                if (!_isEditing && manga.altTitles.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Center(
+                    child: Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: 6.0,
+                      runSpacing: 6.0,
+                      children: manga.altTitles.take(5).map((alt) {
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1E1E28),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.grey.shade800),
+                          ),
+                          child: Text(alt, style: const TextStyle(fontSize: 11, color: Colors.white70)),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 20),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
