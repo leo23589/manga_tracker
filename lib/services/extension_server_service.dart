@@ -172,15 +172,26 @@ class ExtensionServerService extends ChangeNotifier {
         url: url,
       );
       notifyListeners();
-      _fetchPendingCover(formattedTitle);
+      _fetchPendingCoverAndEnglishTitle(formattedTitle);
     }
   }
 
-  Future<void> _fetchPendingCover(String title) async {
+  Future<void> _fetchPendingCoverAndEnglishTitle(String query) async {
     try {
-      final results = await MangaDexService.searchManga(title);
-      if (results.isNotEmpty && _pendingManga != null && _pendingManga!.formattedTitle == title) {
-        _pendingManga!.coverUrl = results.first.coverUrl;
+      final results = await MangaDexService.searchManga(query);
+      if (results.isNotEmpty && _pendingManga != null) {
+        final bestMatch = results.first;
+        final String officialEnglishTitle = (bestMatch.title.isNotEmpty && bestMatch.title != 'Untitled')
+            ? bestMatch.title
+            : _pendingManga!.formattedTitle;
+
+        _pendingManga = PendingMangaUpdate(
+          rawTitle: _pendingManga!.rawTitle,
+          formattedTitle: officialEnglishTitle,
+          chapter: _pendingManga!.chapter,
+          url: _pendingManga!.url,
+          coverUrl: bestMatch.coverUrl,
+        );
         notifyListeners();
       }
     } catch (_) {}
