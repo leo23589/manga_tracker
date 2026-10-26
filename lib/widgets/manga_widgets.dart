@@ -133,6 +133,88 @@ class RatingInputWidget extends StatelessWidget {
   }
 }
 
+class MangaCoverImage extends StatelessWidget {
+  final String? imagePath;
+  final double width;
+  final double height;
+  final double borderRadius;
+
+  const MangaCoverImage({
+    super.key,
+    required this.imagePath,
+    required this.width,
+    required this.height,
+    this.borderRadius = 8.0,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    Widget imageWidget;
+
+    if (imagePath != null && imagePath!.isNotEmpty) {
+      if (imagePath!.startsWith('http://') || imagePath!.startsWith('https://')) {
+        imageWidget = Image.network(
+          imagePath!,
+          width: width,
+          height: height,
+          fit: BoxFit.cover,
+          loadingBuilder: (BuildContext context, Widget child, ImageChunkEvent? loadingProgress) {
+            if (loadingProgress == null) return child;
+            return Container(
+              width: width,
+              height: height,
+              color: Colors.grey.shade800,
+              child: Center(
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  value: loadingProgress.expectedTotalBytes != null
+                      ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                      : null,
+                ),
+              ),
+            );
+          },
+          errorBuilder: (BuildContext context, Object error, StackTrace? stackTrace) {
+            return _buildPlaceholder();
+          },
+        );
+      } else if (File(imagePath!).existsSync()) {
+        imageWidget = Image.file(
+          File(imagePath!),
+          width: width,
+          height: height,
+          fit: BoxFit.cover,
+          errorBuilder: (BuildContext context, Object error, StackTrace? stackTrace) {
+            return _buildPlaceholder();
+          },
+        );
+      } else {
+        imageWidget = _buildPlaceholder();
+      }
+    } else {
+      imageWidget = _buildPlaceholder();
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(borderRadius),
+      child: imageWidget,
+    );
+  }
+
+  Widget _buildPlaceholder() {
+    return Container(
+      width: width,
+      height: height,
+      color: Colors.grey.shade800,
+      child: Icon(
+        Icons.image_not_supported,
+        size: width * 0.4,
+        color: Colors.grey.shade500,
+      ),
+    );
+  }
+}
+
 class MangaListTile extends StatelessWidget {
   final Manga manga;
 
@@ -168,21 +250,11 @@ class MangaListTile extends StatelessWidget {
                     children: <Widget>[
                       Padding(
                         padding: const EdgeInsets.only(right: 16.0),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(8.0),
-                          child: (currentManga.imagePath != null && File(currentManga.imagePath!).existsSync())
-                              ? Image.file(
-                                  File(currentManga.imagePath!),
-                                  width: 85, // Augmenté de ~40% (60 -> 85)
-                                  height: 125, // Augmenté proportionnellement (90 -> 125)
-                                  fit: BoxFit.cover,
-                                )
-                              : Container(
-                                  width: 85,
-                                  height: 125,
-                                  color: Colors.grey.shade800,
-                                  child: Icon(Icons.image_not_supported, size: 35, color: Colors.grey.shade500),
-                                ),
+                        child: MangaCoverImage(
+                          imagePath: currentManga.imagePath,
+                          width: 85,
+                          height: 125,
+                          borderRadius: 8.0,
                         ),
                       ),
                       Expanded(
@@ -217,7 +289,7 @@ class MangaListTile extends StatelessWidget {
                       ),
                       ChapterInputWidget(
                         manga: currentManga,
-                        small: true, // Version compacte de l'incrémenteur
+                        small: true,
                         onChapterChanged: (int val) => currentManga.updateChapter(val),
                       ),
                     ],

@@ -17,6 +17,7 @@ dependencies:
   path: ^1.8.3
   share_plus: ^10.1.0
   file_picker: ^8.1.2
+  http: ^1.2.0
 
 dev_dependencies:
   flutter_test:

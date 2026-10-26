@@ -157,21 +157,11 @@ class _MangaDetailPageState extends State<MangaDetailPage> {
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(12.0),
-                          child: (displayPath != null && File(displayPath).existsSync())
-                              ? Image.file(
-                                  File(displayPath),
-                                  width: 200,
-                                  height: 300,
-                                  fit: BoxFit.cover,
-                                )
-                              : Container(
-                                  width: 200,
-                                  height: 300,
-                                  color: Colors.grey.shade800,
-                                  child: Icon(Icons.image_not_supported, size: 80, color: Colors.grey.shade500),
-                                ),
+                        MangaCoverImage(
+                          imagePath: displayPath,
+                          width: 200,
+                          height: 300,
+                          borderRadius: 12.0,
                         ),
                         if (_isEditing)
                           Container(
