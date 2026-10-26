@@ -74,15 +74,7 @@ class Manga extends ChangeNotifier {
 
   bool get isLinked => mangadexId != null || themes.contains("Linked");
 
-  String get displayTitle {
-    final clean = title.trim();
-    if (isLinked) {
-      if (!clean.endsWith('\$')) {
-        return '$clean \$';
-      }
-    }
-    return clean;
-  }
+  String get displayTitle => title.trim();
 
   static List<String> _sortTags(List<String> tagsInput) {
     List<String> sorted = List<String>.from(tagsInput);
