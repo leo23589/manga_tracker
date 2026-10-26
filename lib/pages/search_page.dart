@@ -119,7 +119,8 @@ class _SearchPageState extends State<SearchPage> {
     final MangaCollectionData mangaCollection = context.watch<MangaCollectionData>();
 
     final List<Manga> filteredLocalMangas = mangaCollection.mangas.where((Manga manga) {
-      final bool matchesText = manga.title.toLowerCase().contains(_localSearchController.text.toLowerCase());
+      final bool matchesText = manga.title.toLowerCase().contains(_localSearchController.text.toLowerCase()) ||
+          manga.altTitles.any((alt) => alt.toLowerCase().contains(_localSearchController.text.toLowerCase()));
       final bool matchesTags = _filterTags.isEmpty || _filterTags.every((String tag) => manga.themes.contains(tag));
       final bool matchesRating = manga.rating >= _minRating;
       final bool matchesStatus = _selectedStatusFilter == null || manga.status == _selectedStatusFilter;
@@ -132,43 +133,40 @@ class _SearchPageState extends State<SearchPage> {
         title: const Text("Search"),
         backgroundColor: Theme.of(context).colorScheme.primaryContainer,
       ),
-      body: Column(
-        children: <Widget>[
-          const SizedBox(height: 12),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: SegmentedButton<SearchMode>(
-              segments: const <ButtonSegment<SearchMode>>[
-                ButtonSegment<SearchMode>(
-                  value: SearchMode.local,
-                  label: Text("My Library"),
-                  icon: Icon(Icons.library_books),
-                ),
-                ButtonSegment<SearchMode>(
-                  value: SearchMode.mangadex,
-                  label: Text("MangaDex Online"),
-                  icon: Icon(Icons.public),
-                ),
-              ],
-              selected: <SearchMode>{_searchMode},
-              onSelectionChanged: (Set<SearchMode> newSelection) {
-                setState(() {
-                  _searchMode = newSelection.first;
-                });
-              },
-            ),
-          ),
-          const SizedBox(height: 12),
-          if (_searchMode == SearchMode.local) ...[
-            Container(
-              color: Theme.of(context).colorScheme.surface,
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.6,
+      body: SafeArea(
+        child: Column(
+          children: <Widget>[
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: SegmentedButton<SearchMode>(
+                segments: const <ButtonSegment<SearchMode>>[
+                  ButtonSegment<SearchMode>(
+                    value: SearchMode.local,
+                    label: Text("My Library"),
+                    icon: Icon(Icons.library_books),
+                  ),
+                  ButtonSegment<SearchMode>(
+                    value: SearchMode.mangadex,
+                    label: Text("MangaDex Online"),
+                    icon: Icon(Icons.public),
+                  ),
+                ],
+                selected: <SearchMode>{_searchMode},
+                onSelectionChanged: (Set<SearchMode> newSelection) {
+                  setState(() {
+                    _searchMode = newSelection.first;
+                  });
+                },
               ),
-              child: SingleChildScrollView(
-                child: Padding(
+            ),
+            const SizedBox(height: 12),
+            if (_searchMode == SearchMode.local) ...[
+              Expanded(
+                child: SingleChildScrollView(
                   padding: const EdgeInsets.all(16),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
                       TextField(
                         controller: _localSearchController,
@@ -223,124 +221,111 @@ class _SearchPageState extends State<SearchPage> {
                           ],
                         ),
                       ),
-                      if (_showAdvancedFilters)
+                      if (_showAdvancedFilters) ...[
+                        const SizedBox(height: 16),
                         Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: <Widget>[
-                            const SizedBox(height: 20),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: <Widget>[
-                                Text("Minimum Rating:", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurfaceVariant)),
-                                const SizedBox(height: 8),
-                                RatingInputWidget(
-                                  currentRating: _minRating,
-                                  onRatingChanged: (int newRating) {
-                                    setState(() {
-                                      _minRating = newRating;
-                                    });
-                                  },
-                                  maxRating: 10,
-                                  enabled: true,
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 20),
-                            Container(
-                              height: 200,
-                              margin: const EdgeInsets.only(top: 10),
-                              decoration: BoxDecoration(
-                                border: Border.all(color: Colors.grey.shade800),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: SingleChildScrollView(
-                                padding: const EdgeInsets.all(8),
-                                child: TagSelector(
-                                  selectedTags: _filterTags,
-                                  onSelectionChanged: (List<String> tags) => setState(() => _filterTags = tags),
-                                ),
-                              ),
+                            Text("Minimum Rating:", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                            const SizedBox(height: 8),
+                            RatingInputWidget(
+                              currentRating: _minRating,
+                              onRatingChanged: (int newRating) {
+                                setState(() {
+                                  _minRating = newRating;
+                                });
+                              },
+                              maxRating: 10,
+                              enabled: true,
                             ),
                           ],
                         ),
+                        const SizedBox(height: 16),
+                        TagSelector(
+                          selectedTags: _filterTags,
+                          onSelectionChanged: (List<String> tags) => setState(() => _filterTags = tags),
+                        ),
+                      ],
+                      const SizedBox(height: 16),
+                      const Divider(),
+                      const SizedBox(height: 8),
+                      filteredLocalMangas.isEmpty
+                          ? const Center(child: Padding(padding: EdgeInsets.all(20), child: Text("No mangas found in your library.")))
+                          : ListView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: filteredLocalMangas.length,
+                              itemBuilder: (BuildContext context, int index) {
+                                return MangaListTile(manga: filteredLocalMangas[index]);
+                              },
+                            ),
                     ],
                   ),
                 ),
               ),
-            ),
-            const Divider(height: 1),
-            Expanded(
-              child: filteredLocalMangas.isEmpty
-                  ? const Center(child: Text("No mangas found in your library."))
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(10),
-                      itemCount: filteredLocalMangas.length,
-                      itemBuilder: (BuildContext context, int index) {
-                        return MangaListTile(manga: filteredLocalMangas[index]);
-                      },
+            ] else ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: TextField(
+                  controller: _mangadexSearchController,
+                  textInputAction: TextInputAction.search,
+                  onSubmitted: (_) => _performMangaDexSearch(),
+                  decoration: InputDecoration(
+                    hintText: "Search MangaDex online...",
+                    prefixIcon: const Icon(Icons.travel_explore),
+                    suffixIcon: IconButton(
+                      icon: const Icon(Icons.search),
+                      onPressed: _performMangaDexSearch,
                     ),
-            ),
-          ] else ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: TextField(
-                controller: _mangadexSearchController,
-                textInputAction: TextInputAction.search,
-                onSubmitted: (_) => _performMangaDexSearch(),
-                decoration: InputDecoration(
-                  hintText: "Search MangaDex online...",
-                  prefixIcon: const Icon(Icons.travel_explore),
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.search),
-                    onPressed: _performMangaDexSearch,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    filled: true,
+                    fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withAlpha((255 * 0.3).round()),
                   ),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  filled: true,
-                  fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withAlpha((255 * 0.3).round()),
                 ),
               ),
-            ),
-            const Divider(height: 1),
-            Expanded(
-              child: _isLoadingMangaDex
-                  ? const Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          CircularProgressIndicator(),
-                          SizedBox(height: 12),
-                          Text("Searching MangaDex..."),
-                        ],
-                      ),
-                    )
-                  : _isOfflineError
-                      ? _buildOfflineErrorWidget()
-                      : !_hasSearchedMangaDex
-                          ? Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.travel_explore, size: 64, color: Colors.grey.shade600),
-                                  const SizedBox(height: 12),
-                                  const Text("Search for titles on MangaDex to import them!"),
-                                ],
-                              ),
-                            )
-                          : _mangadexResults.isEmpty
-                              ? const Center(child: Text("No results found on MangaDex."))
-                              : ListView.builder(
-                                  padding: const EdgeInsets.all(10),
-                                  itemCount: _mangadexResults.length,
-                                  itemBuilder: (BuildContext context, int index) {
-                                    return MangaDexResultTile(
-                                      result: _mangadexResults[index],
-                                      collection: mangaCollection,
-                                      onStateUpdated: () => setState(() {}),
-                                    );
-                                  },
+              const Divider(height: 1),
+              Expanded(
+                child: _isLoadingMangaDex
+                    ? const Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            CircularProgressIndicator(),
+                            SizedBox(height: 12),
+                            Text("Searching MangaDex..."),
+                          ],
+                        ),
+                      )
+                    : _isOfflineError
+                        ? _buildOfflineErrorWidget()
+                        : !_hasSearchedMangaDex
+                            ? Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.travel_explore, size: 64, color: Colors.grey.shade600),
+                                    const SizedBox(height: 12),
+                                    const Text("Search for titles on MangaDex to import them!"),
+                                  ],
                                 ),
-            ),
+                              )
+                            : _mangadexResults.isEmpty
+                                ? const Center(child: Text("No results found on MangaDex."))
+                                : ListView.builder(
+                                    padding: const EdgeInsets.all(10),
+                                    itemCount: _mangadexResults.length,
+                                    itemBuilder: (BuildContext context, int index) {
+                                      return MangaDexResultTile(
+                                        result: _mangadexResults[index],
+                                        collection: mangaCollection,
+                                        onStateUpdated: () => setState(() {}),
+                                      );
+                                    },
+                                  ),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

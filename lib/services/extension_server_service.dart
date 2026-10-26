@@ -1,9 +1,38 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:path_provider/path_provider.dart';
 import '../models/manga.dart';
 import 'mangadex_service.dart';
 import 'notification_service.dart';
+
+class ActivityLogEntry {
+  final String title;
+  final String message;
+  final DateTime timestamp;
+  final bool isSuccess;
+
+  ActivityLogEntry({
+    required this.title,
+    required this.message,
+    required this.timestamp,
+    this.isSuccess = true,
+  });
+
+  Map<String, dynamic> toMap() => {
+        'title': title,
+        'message': message,
+        'timestamp': timestamp.toIso8601String(),
+        'isSuccess': isSuccess,
+      };
+
+  factory ActivityLogEntry.fromMap(Map<String, dynamic> map) => ActivityLogEntry(
+        title: map['title'] ?? '',
+        message: map['message'] ?? '',
+        timestamp: DateTime.parse(map['timestamp']),
+        isSuccess: map['isSuccess'] ?? true,
+      );
+}
 
 class PendingMangaUpdate {
   final String rawTitle;
@@ -31,12 +60,18 @@ class ExtensionServerService extends ChangeNotifier {
   final int _port = 8080;
 
   final List<PendingMangaUpdate> _pendingQueue = <PendingMangaUpdate>[];
+  final List<ActivityLogEntry> _logs = <ActivityLogEntry>[];
   String? _lastNotificationMessage;
+
+  ExtensionServerService() {
+    _loadLogs();
+  }
 
   bool get isListening => _isListening;
   int get port => _port;
   List<PendingMangaUpdate> get pendingQueue => _pendingQueue;
   PendingMangaUpdate? get currentPending => _pendingQueue.isNotEmpty ? _pendingQueue.first : null;
+  List<ActivityLogEntry> get logs => List<ActivityLogEntry>.unmodifiable(_logs);
   String? get lastNotificationMessage => _lastNotificationMessage;
 
   void dismissCurrentPending() {
@@ -56,6 +91,62 @@ class ExtensionServerService extends ChangeNotifier {
   void clearNotificationMessage() {
     _lastNotificationMessage = null;
     notifyListeners();
+  }
+
+  void clearLogs() {
+    _logs.clear();
+    _saveLogs();
+    notifyListeners();
+  }
+
+  Future<File> get _logFile async {
+    final dir = await getApplicationDocumentsDirectory();
+    return File('${dir.path}/extension_logs.json');
+  }
+
+  Future<void> _loadLogs() async {
+    try {
+      final file = await _logFile;
+      if (await file.exists()) {
+        final String content = await file.readAsString();
+        final List<dynamic> jsonList = jsonDecode(content);
+        _logs.clear();
+        _logs.addAll(jsonList.map((e) => ActivityLogEntry.fromMap(e)));
+        _purgeOldLogs();
+      }
+    } catch (e) {
+      debugPrint("Error loading logs: $e");
+    }
+  }
+
+  Future<void> _saveLogs() async {
+    try {
+      final file = await _logFile;
+      final String content = jsonEncode(_logs.map((e) => e.toMap()).toList());
+      await file.writeAsString(content);
+    } catch (e) {
+      debugPrint("Error saving logs: $e");
+    }
+  }
+
+  void _addLog(String title, String message, {bool isSuccess = true}) {
+    _logs.insert(
+      0,
+      ActivityLogEntry(
+        title: title,
+        message: message,
+        timestamp: DateTime.now(),
+        isSuccess: isSuccess,
+      ),
+    );
+    _purgeOldLogs();
+    _saveLogs();
+    notifyListeners();
+  }
+
+  void _purgeOldLogs() {
+    final now = DateTime.now();
+    _logs.removeWhere((log) => now.difference(log.timestamp).inDays >= 30);
   }
 
   Future<void> startServer(MangaCollectionData collection) async {
@@ -182,7 +273,7 @@ class ExtensionServerService extends ChangeNotifier {
       }
     }
 
-    // 1. Direct Search in Local Collection (by MangaDex ID, Source URL, Primary Title, or AltTitles)
+    // 1. Direct Search in Local Collection
     Manga? matchedManga;
     for (final Manga m in collection.mangas) {
       if (incomingMangaDexId != null && m.mangadexId == incomingMangaDexId) {
@@ -214,7 +305,7 @@ class ExtensionServerService extends ChangeNotifier {
       }
     }
 
-    // 2. Search MangaDex in background to check if this corresponds to an existing linked item
+    // 2. Background MangaDex Search
     if (matchedManga == null) {
       try {
         final results = await MangaDexService.searchManga(formattedTitle);
@@ -258,20 +349,26 @@ class ExtensionServerService extends ChangeNotifier {
           if (matchedManga.status == MangaStatus.planToRead) {
             matchedManga.updateStatus(MangaStatus.reading);
           }
-          _lastNotificationMessage = "Updated '${matchedManga.displayTitle}' to Chapter $chapter";
+          final String msg = "Updated '${matchedManga.displayTitle}' to Chapter $chapter";
+          _lastNotificationMessage = msg;
+          _addLog("Chapter Updated", msg);
           NotificationService.showChapterUpdatedNotification(
             title: matchedManga.displayTitle,
             chapter: chapter,
           );
         } else {
-          _lastNotificationMessage = "'${matchedManga.displayTitle}' is already at Chapter ${matchedManga.currentChapter}";
+          final String msg = "'${matchedManga.displayTitle}' is already at Chapter ${matchedManga.currentChapter}";
+          _lastNotificationMessage = msg;
+          _addLog("Already Up to Date", msg);
           NotificationService.showAlreadyUpToDateNotification(
             title: matchedManga.displayTitle,
             chapter: matchedManga.currentChapter,
           );
         }
       } else {
-        _lastNotificationMessage = "'${matchedManga.displayTitle}' is already in your library";
+        final String msg = "'${matchedManga.displayTitle}' is already in your library";
+        _lastNotificationMessage = msg;
+        _addLog("Already in Library", msg);
         NotificationService.showAlreadyUpToDateNotification(
           title: matchedManga.displayTitle,
           chapter: matchedManga.currentChapter,
@@ -297,6 +394,7 @@ class ExtensionServerService extends ChangeNotifier {
         _fetchPendingCoverAndEnglishTitle(pending);
       }
 
+      _addLog("New Suggestion", "Detected '$formattedTitle' (${isChapter ? 'Ch. $chapter' : 'Title Page'})");
       notifyListeners();
 
       if (isChapter) {
@@ -355,7 +453,9 @@ class ExtensionServerService extends ChangeNotifier {
       } catch (_) {}
     }
 
-    _lastNotificationMessage = "Linked '${pending.formattedTitle}' to '${targetManga.displayTitle}'!";
+    final String msg = "Linked '${pending.formattedTitle}' to '${targetManga.displayTitle}'!";
+    _lastNotificationMessage = msg;
+    _addLog("Linked Manga", msg);
     notifyListeners();
   }
 
@@ -398,7 +498,9 @@ class ExtensionServerService extends ChangeNotifier {
     );
 
     collection.addManga(newManga);
-    _lastNotificationMessage = "Added '${newManga.displayTitle}' (${pending.defaultStatus.label}) to library!";
+    final String msg = "Added '${newManga.displayTitle}' (${pending.defaultStatus.label}) to library!";
+    _lastNotificationMessage = msg;
+    _addLog("Manga Added", msg);
     notifyListeners();
   }
 
