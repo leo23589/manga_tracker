@@ -112,7 +112,8 @@ class _MainScreenState extends State<MainScreen> {
       });
     }
 
-    final pending = serverService.pendingManga;
+    final pending = serverService.currentPending;
+    final queueCount = serverService.pendingQueue.length;
 
     return Scaffold(
       body: Stack(
@@ -124,79 +125,161 @@ class _MainScreenState extends State<MainScreen> {
               right: 16,
               bottom: 16,
               child: Material(
-                elevation: 12,
+                elevation: 16,
                 borderRadius: BorderRadius.circular(16),
-                color: const Color(0xFF1E1B4B),
+                color: const Color(0xFF181824),
                 child: Container(
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFF6366F1).withAlpha((255 * 0.5).round()), width: 1.5),
+                    border: Border.all(
+                      color: const Color(0xFF6366F1).withAlpha((255 * 0.6).round()),
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withAlpha((255 * 0.5).round()),
+                        blurRadius: 16,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                  padding: const EdgeInsets.all(12.0),
-                  child: Row(
+                  padding: const EdgeInsets.all(14.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      if (pending.coverUrl != null && pending.coverUrl!.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(right: 12.0),
-                          child: MangaCoverImage(
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.extension, color: Colors.amber, size: 20),
+                              const SizedBox(width: 8),
+                              Text(
+                                pending.isChapter ? "New Manga Detected" : "Add to Plan to Read",
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                  color: Colors.amber,
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (queueCount > 1)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.indigo.shade900,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                "1 of $queueCount in queue",
+                                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white70),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          MangaCoverImage(
                             imagePath: pending.coverUrl,
-                            width: 45,
-                            height: 65,
+                            width: 50,
+                            height: 75,
                             borderRadius: 8,
                           ),
-                        )
-                      else
-                        Container(
-                          width: 45,
-                          height: 65,
-                          margin: const EdgeInsets.only(right: 12.0),
-                          decoration: BoxDecoration(
-                            color: Colors.amber.shade900.withAlpha((255 * 0.3).round()),
-                            borderRadius: BorderRadius.circular(8),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  pending.formattedTitle,
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 6),
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: pending.defaultStatus == MangaStatus.reading
+                                            ? const Color(0xFF0284C7).withAlpha((255 * 0.3).round())
+                                            : const Color(0xFF7C3AED).withAlpha((255 * 0.3).round()),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        pending.defaultStatus.label,
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: pending.defaultStatus == MangaStatus.reading
+                                              ? const Color(0xFF38BDF8)
+                                              : const Color(0xFFA78BFA),
+                                        ),
+                                      ),
+                                    ),
+                                    if (pending.isChapter) ...[
+                                      const SizedBox(width: 10),
+                                      Row(
+                                        children: [
+                                          InkWell(
+                                            onTap: () {
+                                              if (pending.chapter > 1) {
+                                                serverService.updateCurrentPendingChapter(pending.chapter - 1);
+                                              }
+                                            },
+                                            child: const Icon(Icons.remove_circle_outline, size: 18, color: Colors.white70),
+                                          ),
+                                          Padding(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6.0),
+                                            child: Text(
+                                              "Ch. ${pending.chapter}",
+                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                                            ),
+                                          ),
+                                          InkWell(
+                                            onTap: () {
+                                              serverService.updateCurrentPendingChapter(pending.chapter + 1);
+                                            },
+                                            child: const Icon(Icons.add_circle_outline, size: 18, color: Colors.white70),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
-                          child: const Icon(Icons.extension, color: Colors.amber, size: 28),
-                        ),
-                      Expanded(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              "Extension Detected Reading",
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.amberAccent),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              "${pending.formattedTitle} (Ch. ${pending.chapter})",
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 2),
-                            const Text(
-                              "Not in your library yet",
-                              style: TextStyle(fontSize: 11, color: Colors.white70),
-                            ),
-                          ],
-                        ),
+                        ],
                       ),
-                      const SizedBox(width: 8),
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF6366F1),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                        ),
-                        onPressed: () {
-                          serverService.quickAddPendingManga(collection);
-                        },
-                        child: const Text("Quick Add", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close, size: 18, color: Colors.white70),
-                        onPressed: () {
-                          serverService.clearPendingManga();
-                        },
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: () {
+                              serverService.dismissCurrentPending();
+                            },
+                            child: const Text("No / Skip", style: TextStyle(color: Colors.white54)),
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF6366F1),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                            ),
+                            onPressed: () {
+                              serverService.addCurrentPendingManga(collection);
+                            },
+                            icon: const Icon(Icons.add, size: 16),
+                            label: const Text("Add to Library", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          ),
+                        ],
                       ),
                     ],
                   ),

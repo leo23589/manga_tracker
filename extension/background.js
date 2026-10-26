@@ -3,7 +3,8 @@ const DEFAULT_SITES = [
   "manganato.com",
   "readmanga.app",
   "mangakakalot.com",
-  "mgeko.cc"
+  "mgeko.cc",
+  "manganami.com"
 ];
 
 // List of URL path keywords that are NOT manga pages
@@ -12,6 +13,8 @@ const IGNORED_PATHS = [
   "search", "user", "profile", "bookmark", "bookmarks", "history", "home",
   "genre", "genres", "tag", "tags", "author", "authors", "group", "groups"
 ];
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Cache of tab ID -> last visited URL
 const tabUrlMap = new Map();
@@ -40,7 +43,7 @@ browser.tabs.onRemoved.addListener((tabId, removeInfo) => {
 
 /**
  * Parses manga URL.
- * Supports mgeko.cc (/reader/en/title-chapter-52-eng-li/), mangadex, manganato, etc.
+ * Supports mangadex (/title/uuid/slug), manganami (/manga/slug/chapter-188), mgeko.cc, etc.
  */
 function processAndSendMangaData(url) {
   try {
@@ -87,7 +90,7 @@ function parseMangaUrl(urlString) {
     if (pathParts.length === 0) return null; // Homepage
     if (pathParts.some((p) => IGNORED_PATHS.includes(p))) return null;
 
-    // Check Pattern A: Combined title + chapter in single path segment
+    // Pattern A: Combined title + chapter in single path segment
     // e.g. /reader/en/a-wimps-strategy-guide-to-conquer-the-tower-chapter-52-eng-li/
     for (let i = 0; i < pathParts.length; i++) {
       const part = pathParts[i];
@@ -111,8 +114,8 @@ function parseMangaUrl(urlString) {
       }
     }
 
-    // Check Pattern B: Explicit chapter indicator in separate path/query
-    // e.g. /manga/one-piece/chapter-1081 or /chapter/1081 or ?chapter=1081
+    // Pattern B: Explicit chapter indicator in separate path/query
+    // e.g. /manga/cheonhwa-archives-young-master/chapter-188 or /chapter/1081
     const chapterMatch = fullPath.match(/(?:chapter|chap|ch|c)[-/_=]?([0-9]+(?:\.[0-9]+)?)/i);
     const isChapter = !!chapterMatch;
     let chapterNum = 1;
@@ -125,11 +128,13 @@ function parseMangaUrl(urlString) {
     }
 
     // Extract title slug
+    // Skip UUIDs, generic keywords, chapter segments
     let titleSlug = "";
     for (let i = 0; i < pathParts.length; i++) {
       const part = pathParts[i];
       if (["manga", "title", "series", "read", "reader", "en", "comic", "chapter", "chap", "ch"].includes(part)) continue;
       if (part.match(/^(?:chapter|chap|ch|c)[-/_]?[0-9]+/i)) continue;
+      if (UUID_REGEX.test(part)) continue;
       if (!isNaN(parseFloat(part))) continue;
 
       titleSlug = part;

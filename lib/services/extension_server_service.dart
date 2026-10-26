@@ -7,8 +7,8 @@ import 'notification_service.dart';
 
 class PendingMangaUpdate {
   final String rawTitle;
-  final String formattedTitle;
-  final int chapter;
+  String formattedTitle;
+  int chapter;
   final bool isChapter;
   final MangaStatus defaultStatus;
   final String? url;
@@ -30,17 +30,27 @@ class ExtensionServerService extends ChangeNotifier {
   bool _isListening = false;
   final int _port = 8080;
 
-  PendingMangaUpdate? _pendingManga;
+  final List<PendingMangaUpdate> _pendingQueue = <PendingMangaUpdate>[];
   String? _lastNotificationMessage;
 
   bool get isListening => _isListening;
   int get port => _port;
-  PendingMangaUpdate? get pendingManga => _pendingManga;
+  List<PendingMangaUpdate> get pendingQueue => _pendingQueue;
+  PendingMangaUpdate? get currentPending => _pendingQueue.isNotEmpty ? _pendingQueue.first : null;
   String? get lastNotificationMessage => _lastNotificationMessage;
 
-  void clearPendingManga() {
-    _pendingManga = null;
-    notifyListeners();
+  void dismissCurrentPending() {
+    if (_pendingQueue.isNotEmpty) {
+      _pendingQueue.removeAt(0);
+      notifyListeners();
+    }
+  }
+
+  void updateCurrentPendingChapter(int newChapter) {
+    if (_pendingQueue.isNotEmpty && newChapter >= 1) {
+      _pendingQueue.first.chapter = newChapter;
+      notifyListeners();
+    }
   }
 
   void clearNotificationMessage() {
@@ -58,7 +68,6 @@ class ExtensionServerService extends ChangeNotifier {
       debugPrint("ExtensionServerService running on http://127.0.0.1:$_port");
 
       _server!.listen((HttpRequest request) async {
-        // Enable CORS
         request.response.headers.add('Access-Control-Allow-Origin', '*');
         request.response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization');
         request.response.headers.add('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -191,19 +200,27 @@ class ExtensionServerService extends ChangeNotifier {
       } else {
         _lastNotificationMessage = "'${matchedManga.title}' is already in your library";
       }
-      _pendingManga = null;
       notifyListeners();
     } else {
       final MangaStatus initialStatus = isChapter ? MangaStatus.reading : MangaStatus.planToRead;
 
-      _pendingManga = PendingMangaUpdate(
-        rawTitle: rawTitle,
-        formattedTitle: formattedTitle,
-        chapter: chapter,
-        isChapter: isChapter,
-        defaultStatus: initialStatus,
-        url: url,
-      );
+      // Check if already in pending queue
+      final int existingIndex = _pendingQueue.indexWhere((p) => normalizeTitle(p.rawTitle) == normIncoming);
+      if (existingIndex >= 0) {
+        _pendingQueue[existingIndex].chapter = chapter;
+      } else {
+        final pending = PendingMangaUpdate(
+          rawTitle: rawTitle,
+          formattedTitle: formattedTitle,
+          chapter: chapter,
+          isChapter: isChapter,
+          defaultStatus: initialStatus,
+          url: url,
+        );
+        _pendingQueue.add(pending);
+        _fetchPendingCoverAndEnglishTitle(pending);
+      }
+
       notifyListeners();
 
       if (isChapter) {
@@ -217,42 +234,32 @@ class ExtensionServerService extends ChangeNotifier {
           chapter: 1,
         );
       }
-
-      _fetchPendingCoverAndEnglishTitle(formattedTitle);
     }
   }
 
-  Future<void> _fetchPendingCoverAndEnglishTitle(String query) async {
+  Future<void> _fetchPendingCoverAndEnglishTitle(PendingMangaUpdate pending) async {
     try {
-      final results = await MangaDexService.searchManga(query);
-      if (results.isNotEmpty && _pendingManga != null) {
+      final results = await MangaDexService.searchManga(pending.formattedTitle);
+      if (results.isNotEmpty) {
         final bestMatch = results.first;
-        final String officialEnglishTitle = (bestMatch.title.isNotEmpty && bestMatch.title != 'Untitled')
-            ? bestMatch.title
-            : _pendingManga!.formattedTitle;
-
-        _pendingManga = PendingMangaUpdate(
-          rawTitle: _pendingManga!.rawTitle,
-          formattedTitle: officialEnglishTitle,
-          chapter: _pendingManga!.chapter,
-          isChapter: _pendingManga!.isChapter,
-          defaultStatus: _pendingManga!.defaultStatus,
-          url: _pendingManga!.url,
-          coverUrl: bestMatch.coverUrl,
-        );
+        if (bestMatch.title.isNotEmpty && bestMatch.title != 'Untitled') {
+          pending.formattedTitle = bestMatch.title;
+        }
+        pending.coverUrl = bestMatch.coverUrl;
         notifyListeners();
       }
     } catch (_) {}
   }
 
-  Future<void> quickAddPendingManga(MangaCollectionData collection) async {
-    if (_pendingManga == null) return;
+  Future<void> addCurrentPendingManga(MangaCollectionData collection) async {
+    if (_pendingQueue.isEmpty) return;
 
-    final PendingMangaUpdate pending = _pendingManga!;
+    final PendingMangaUpdate pending = _pendingQueue.removeAt(0);
+    notifyListeners();
 
     String? coverUrl = pending.coverUrl;
     String synopsis = "";
-    List<String> tags = <String>["Manga"];
+    List<String> tags = <String>["Manga", "Linked"];
 
     try {
       final results = await MangaDexService.searchManga(pending.formattedTitle);
@@ -260,7 +267,8 @@ class ExtensionServerService extends ChangeNotifier {
         final bestMatch = results.first;
         coverUrl = await MangaDexService.downloadCoverImageLocally(bestMatch.coverUrl);
         synopsis = bestMatch.synopsis;
-        tags = bestMatch.tags;
+        tags = List<String>.from(bestMatch.tags);
+        if (!tags.contains("Linked")) tags.add("Linked");
       }
     } catch (_) {}
 
@@ -275,8 +283,7 @@ class ExtensionServerService extends ChangeNotifier {
     );
 
     collection.addManga(newManga);
-    _lastNotificationMessage = "Added '${pending.formattedTitle}' (${pending.defaultStatus.label}) to your library!";
-    _pendingManga = null;
+    _lastNotificationMessage = "Added '${pending.formattedTitle}' (${pending.defaultStatus.label}) to library!";
     notifyListeners();
   }
 }
