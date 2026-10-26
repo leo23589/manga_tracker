@@ -1,4 +1,10 @@
-const DEFAULT_SITES = ["mangadex.org", "manganato.com", "readmanga.app", "mangakakalot.com"];
+const DEFAULT_SITES = [
+  "mangadex.org",
+  "manganato.com",
+  "readmanga.app",
+  "mangakakalot.com",
+  "mgeko.cc"
+];
 
 // List of URL path keywords that are NOT manga pages
 const IGNORED_PATHS = [
@@ -34,8 +40,7 @@ browser.tabs.onRemoved.addListener((tabId, removeInfo) => {
 
 /**
  * Parses manga URL.
- * - If URL contains a chapter indicator (e.g. /chapter-1081) -> sends as Reading chapter update.
- * - If URL contains a manga title page but no chapter -> sends as Plan to Read.
+ * Supports mgeko.cc (/reader/en/title-chapter-52-eng-li/), mangadex, manganato, etc.
  */
 function processAndSendMangaData(url) {
   try {
@@ -82,7 +87,32 @@ function parseMangaUrl(urlString) {
     if (pathParts.length === 0) return null; // Homepage
     if (pathParts.some((p) => IGNORED_PATHS.includes(p))) return null;
 
-    // Check if URL contains explicit chapter keyword or parameter
+    // Check Pattern A: Combined title + chapter in single path segment
+    // e.g. /reader/en/a-wimps-strategy-guide-to-conquer-the-tower-chapter-52-eng-li/
+    for (let i = 0; i < pathParts.length; i++) {
+      const part = pathParts[i];
+      if (["manga", "title", "series", "read", "reader", "en", "comic"].includes(part)) continue;
+
+      const combinedMatch = part.match(/^(.+?)[-_]chapter[-_]([0-9]+(?:\.[0-9]+)?)(?:[-_].*)?$/i);
+      if (combinedMatch) {
+        let titleSlug = combinedMatch[1]
+          .replace(/^(manga|read)-/, "")
+          .replace(/-(manga|read)$/, "")
+          .trim();
+        const chapterNum = parseFloat(combinedMatch[2]);
+
+        if (titleSlug && !isNaN(chapterNum) && chapterNum > 0) {
+          return {
+            title: titleSlug,
+            chapter: Math.floor(chapterNum),
+            isChapter: true
+          };
+        }
+      }
+    }
+
+    // Check Pattern B: Explicit chapter indicator in separate path/query
+    // e.g. /manga/one-piece/chapter-1081 or /chapter/1081 or ?chapter=1081
     const chapterMatch = fullPath.match(/(?:chapter|chap|ch|c)[-/_=]?([0-9]+(?:\.[0-9]+)?)/i);
     const isChapter = !!chapterMatch;
     let chapterNum = 1;
@@ -98,7 +128,7 @@ function parseMangaUrl(urlString) {
     let titleSlug = "";
     for (let i = 0; i < pathParts.length; i++) {
       const part = pathParts[i];
-      if (["manga", "title", "series", "read", "comic", "chapter", "chap", "ch"].includes(part)) continue;
+      if (["manga", "title", "series", "read", "reader", "en", "comic", "chapter", "chap", "ch"].includes(part)) continue;
       if (part.match(/^(?:chapter|chap|ch|c)[-/_]?[0-9]+/i)) continue;
       if (!isNaN(parseFloat(part))) continue;
 

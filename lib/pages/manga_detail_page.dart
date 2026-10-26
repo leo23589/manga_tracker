@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../models/manga.dart';
 import '../services/mangadex_service.dart';
 import '../widgets/dialogs/mangadex_autofill_dialog.dart';
+import '../widgets/dialogs/mangadex_cover_picker_dialog.dart';
 import '../widgets/manga_widgets.dart';
 
 class MangaDetailPage extends StatefulWidget {
@@ -81,24 +82,16 @@ class _MangaDetailPageState extends State<MangaDetailPage> {
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.travel_explore, color: Colors.indigoAccent),
-                title: const Text("Search & Set Cover from MangaDex"),
+                leading: const Icon(Icons.grid_view, color: Colors.indigoAccent),
+                title: const Text("Search Cover Grid on MangaDex"),
                 onTap: () {
                   Navigator.pop(sheetContext);
-                  showMangaDexAutofillDialog(
+                  showMangaDexCoverPickerDialog(
                     parentContext: context,
-                    initialQuery: manga.title,
-                    onSelect: (result) async {
-                      final localPath = await MangaDexService.downloadCoverImageLocally(result.coverUrl);
-                      if (localPath != null) {
-                        manga.updateImage(localPath);
-                        setState(() => _temporaryImagePath = localPath);
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Cover image updated!'), backgroundColor: Colors.green),
-                          );
-                        }
-                      }
+                    mangaTitle: manga.title,
+                    onSelectCover: (localPath) {
+                      manga.updateImage(localPath);
+                      setState(() => _temporaryImagePath = localPath);
                     },
                   );
                 },
@@ -128,7 +121,11 @@ class _MangaDetailPageState extends State<MangaDetailPage> {
         final localPath = await MangaDexService.downloadCoverImageLocally(result.coverUrl);
         manga.updateTitle(result.title);
         manga.updateSynopsis(result.synopsis);
-        manga.updateThemes(result.tags);
+        final List<String> updatedTags = List<String>.from(result.tags);
+        if (!updatedTags.contains("Linked")) {
+          updatedTags.add("Linked");
+        }
+        manga.updateThemes(updatedTags);
         if (localPath != null) {
           manga.updateImage(localPath);
         }

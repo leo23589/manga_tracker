@@ -105,8 +105,13 @@ class DisplayTagList extends StatelessWidget {
       children: tags.map<Widget>((String tag) {
         Color? effectiveBackgroundColor = backgroundColor ?? Colors.grey.shade800;
         Color? effectiveTextColor = textColor ?? Colors.white70;
+        Widget? avatar;
 
-        if (AppConstants.content.contains(tag)) {
+        if (tag == "Linked") {
+          effectiveBackgroundColor = const Color(0xFF4F46E5);
+          effectiveTextColor = Colors.white;
+          avatar = const Icon(Icons.link, size: 14, color: Colors.amberAccent);
+        } else if (AppConstants.content.contains(tag)) {
           effectiveBackgroundColor = contentTagColor ?? Colors.red.shade900;
         } else if (AppConstants.themes.contains(tag)) {
           effectiveBackgroundColor = themeTagColor ?? Colors.deepPurple.shade900;
@@ -115,14 +120,15 @@ class DisplayTagList extends StatelessWidget {
         }
 
         return Chip(
+          avatar: avatar,
           label: Text(tag),
           backgroundColor: effectiveBackgroundColor,
-          labelStyle: TextStyle(color: effectiveTextColor, fontSize: 12),
+          labelStyle: TextStyle(color: effectiveTextColor, fontSize: 12, fontWeight: tag == "Linked" ? FontWeight.bold : FontWeight.normal),
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
           visualDensity: VisualDensity.compact,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
-            side: BorderSide(color: Colors.grey.shade700),
+            side: BorderSide(color: tag == "Linked" ? const Color(0xFF818CF8) : Colors.grey.shade700),
           ),
         );
       }).toList(),
