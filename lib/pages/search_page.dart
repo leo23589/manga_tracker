@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../models/manga.dart';
 import '../services/mangadex_service.dart';
 import '../widgets/manga_widgets.dart';
-import '../widgets/tag_selector.dart';
+import '../widgets/search/mangadex_result_tile.dart';
 
 enum SearchMode { local, mangadex }
 
@@ -57,183 +57,6 @@ class _SearchPageState extends State<SearchPage> {
     }
   }
 
-  void _showMangaDexDetailModal(BuildContext context, MangaDexSearchResult result, MangaCollectionData collection) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (BuildContext modalContext) {
-        return DraggableScrollableSheet(
-          expand: false,
-          initialChildSize: 0.7,
-          maxChildSize: 0.9,
-          builder: (BuildContext context, ScrollController scrollController) {
-            return Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: ListView(
-                controller: scrollController,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 5,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade600,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Center(
-                    child: MangaCoverImage(
-                      imagePath: result.coverUrl,
-                      width: 150,
-                      height: 220,
-                      borderRadius: 12.0,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    result.title,
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 12),
-                  DisplayTagList(
-                    tags: result.tags,
-                    contentTagColor: Colors.red.shade700,
-                    themeTagColor: Colors.purple.shade700,
-                    genreTagColor: Colors.blue.shade700,
-                    textColor: Colors.white,
-                  ),
-                  const SizedBox(height: 16),
-                  Text("Synopsis", style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 6),
-                  Text(
-                    result.synopsis.isEmpty ? "No synopsis available." : result.synopsis,
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 24),
-                  StatefulBuilder(
-                    builder: (BuildContext context, StateSetter setModalState) {
-                      final bool added = collection.mangas.any(
-                        (m) => m.title.toLowerCase() == result.title.toLowerCase(),
-                      );
-                      return ElevatedButton.icon(
-                        onPressed: added
-                            ? null
-                            : () {
-                                collection.addManga(result.toManga());
-                                setModalState(() {});
-                                setState(() {});
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Added "${result.title}" to your library!'),
-                                    backgroundColor: Colors.green,
-                                  ),
-                                );
-                              },
-                        icon: Icon(added ? Icons.check : Icons.library_add),
-                        label: Text(added ? "In Your Library" : "Add to My Library"),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          backgroundColor: added ? Colors.grey : Theme.of(context).colorScheme.primary,
-                          foregroundColor: Colors.white,
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildMangaDexResultTile(MangaDexSearchResult result, MangaCollectionData collection) {
-    final bool isAlreadyInLibrary = collection.mangas.any(
-      (m) => m.title.toLowerCase() == result.title.toLowerCase(),
-    );
-
-    return Card(
-      elevation: 2,
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      child: InkWell(
-        onTap: () => _showMangaDexDetailModal(context, result, collection),
-        child: Padding(
-          padding: const EdgeInsets.all(12.0),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              MangaCoverImage(
-                imagePath: result.coverUrl,
-                width: 85,
-                height: 125,
-                borderRadius: 8.0,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      result.title,
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    if (result.tags.isNotEmpty) ...[
-                      DisplayTagList(
-                        tags: result.tags.take(3).toList(),
-                        contentTagColor: Colors.red.shade700,
-                        textColor: Colors.white,
-                      ),
-                      const SizedBox(height: 6),
-                    ],
-                    Text(
-                      result.synopsis.isEmpty ? "No synopsis available." : result.synopsis,
-                      style: TextStyle(color: Colors.grey.shade400, fontSize: 12),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 8),
-                    ElevatedButton.icon(
-                      onPressed: isAlreadyInLibrary
-                          ? null
-                          : () {
-                              collection.addManga(result.toManga());
-                              setState(() {});
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Added "${result.title}" to your library!'),
-                                  backgroundColor: Colors.green,
-                                ),
-                              );
-                            },
-                      icon: Icon(isAlreadyInLibrary ? Icons.check : Icons.library_add, size: 16),
-                      label: Text(isAlreadyInLibrary ? "In Library" : "Add to Library", style: const TextStyle(fontSize: 12)),
-                      style: ElevatedButton.styleFrom(
-                        visualDensity: VisualDensity.compact,
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        backgroundColor: isAlreadyInLibrary ? Colors.grey.shade800 : Colors.indigo,
-                        foregroundColor: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final MangaCollectionData mangaCollection = context.watch<MangaCollectionData>();
@@ -254,7 +77,6 @@ class _SearchPageState extends State<SearchPage> {
       body: Column(
         children: <Widget>[
           const SizedBox(height: 12),
-          // Toggle Segmented Control
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: SegmentedButton<SearchMode>(
@@ -279,8 +101,6 @@ class _SearchPageState extends State<SearchPage> {
             ),
           ),
           const SizedBox(height: 12),
-
-          // Search Mode Specific UI
           if (_searchMode == SearchMode.local) ...[
             Container(
               color: Theme.of(context).colorScheme.surface,
@@ -374,7 +194,6 @@ class _SearchPageState extends State<SearchPage> {
                     ),
             ),
           ] else ...[
-            // MangaDex Search Mode UI
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: TextField(
@@ -424,7 +243,11 @@ class _SearchPageState extends State<SearchPage> {
                               padding: const EdgeInsets.all(10),
                               itemCount: _mangadexResults.length,
                               itemBuilder: (BuildContext context, int index) {
-                                return _buildMangaDexResultTile(_mangadexResults[index], mangaCollection);
+                                return MangaDexResultTile(
+                                  result: _mangadexResults[index],
+                                  collection: mangaCollection,
+                                  onStateUpdated: () => setState(() {}),
+                                );
                               },
                             ),
             ),
