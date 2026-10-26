@@ -91,6 +91,93 @@ class _MainScreenState extends State<MainScreen> {
     });
   }
 
+  void _showLinkToExistingDialog(
+    BuildContext parentContext,
+    MangaCollectionData collection,
+    ExtensionServerService serverService,
+    PendingMangaUpdate pending,
+  ) {
+    if (collection.mangas.isEmpty) {
+      ScaffoldMessenger.of(parentContext).showSnackBar(
+        const SnackBar(content: Text("Your library is empty. Add a manga first!")),
+      );
+      return;
+    }
+
+    String searchQuery = "";
+
+    showDialog<void>(
+      context: parentContext,
+      builder: (BuildContext dialogContext) {
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setState) {
+            final List<Manga> filtered = collection.mangas.where((m) {
+              final q = searchQuery.toLowerCase();
+              return q.isEmpty ||
+                  m.title.toLowerCase().contains(q) ||
+                  m.altTitles.any((alt) => alt.toLowerCase().contains(q));
+            }).toList();
+
+            return AlertDialog(
+              title: const Text("Link to Existing Manga"),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      decoration: const InputDecoration(
+                        hintText: "Search your library...",
+                        prefixIcon: Icon(Icons.search),
+                        isDense: true,
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: (val) => setState(() => searchQuery = val),
+                    ),
+                    const SizedBox(height: 12),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 300),
+                      child: filtered.isEmpty
+                          ? const Center(child: Padding(padding: EdgeInsets.all(16), child: Text("No manga found.")))
+                          : ListView.builder(
+                              shrinkWrap: true,
+                              itemCount: filtered.length,
+                              itemBuilder: (context, index) {
+                                final manga = filtered[index];
+                                return ListTile(
+                                  leading: MangaCoverImage(
+                                    imagePath: manga.imagePath,
+                                    width: 35,
+                                    height: 50,
+                                    borderRadius: 6,
+                                  ),
+                                  title: Text(manga.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                  subtitle: Text("Ch. ${manga.currentChapter} • ${manga.status.label}", style: const TextStyle(fontSize: 12)),
+                                  trailing: const Icon(Icons.link, color: Colors.indigoAccent),
+                                  onTap: () {
+                                    Navigator.of(dialogContext).pop();
+                                    serverService.linkCurrentPendingToExisting(manga);
+                                  },
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text("Cancel"),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final collection = context.watch<MangaCollectionData>();
@@ -258,26 +345,41 @@ class _MainScreenState extends State<MainScreen> {
                       ),
                       const SizedBox(height: 12),
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          TextButton(
-                            onPressed: () {
-                              serverService.dismissCurrentPending();
-                            },
-                            child: const Text("No / Skip", style: TextStyle(color: Colors.white54)),
-                          ),
-                          const SizedBox(width: 8),
-                          ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF6366F1),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          TextButton.icon(
+                            style: TextButton.styleFrom(
+                              foregroundColor: const Color(0xFF818CF8),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             ),
+                            icon: const Icon(Icons.link, size: 16),
+                            label: const Text("Link to Existing", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                             onPressed: () {
-                              serverService.addCurrentPendingManga(collection);
+                              _showLinkToExistingDialog(context, collection, serverService, pending);
                             },
-                            icon: const Icon(Icons.add, size: 16),
-                            label: const Text("Add to Library", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          ),
+                          Row(
+                            children: [
+                              TextButton(
+                                onPressed: () {
+                                  serverService.dismissCurrentPending();
+                                },
+                                child: const Text("Skip", style: TextStyle(color: Colors.white54, fontSize: 12)),
+                              ),
+                              const SizedBox(width: 4),
+                              ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF6366F1),
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                ),
+                                onPressed: () {
+                                  serverService.addCurrentPendingManga(collection);
+                                },
+                                icon: const Icon(Icons.add, size: 16),
+                                label: const Text("Add New", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                              ),
+                            ],
                           ),
                         ],
                       ),

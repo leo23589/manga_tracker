@@ -327,6 +327,38 @@ class ExtensionServerService extends ChangeNotifier {
     } catch (_) {}
   }
 
+  Future<void> linkCurrentPendingToExisting(Manga targetManga) async {
+    if (_pendingQueue.isEmpty) return;
+
+    final PendingMangaUpdate pending = _pendingQueue.removeAt(0);
+    notifyListeners();
+
+    if (pending.isChapter && pending.chapter > targetManga.currentChapter) {
+      targetManga.updateChapter(pending.chapter);
+      if (targetManga.status == MangaStatus.planToRead) {
+        targetManga.updateStatus(MangaStatus.reading);
+      }
+    }
+
+    if (pending.url != null) {
+      targetManga.addSourceUrl(pending.url);
+    }
+
+    if (!targetManga.isLinked) {
+      try {
+        final results = await MangaDexService.searchManga(targetManga.title);
+        if (results.isNotEmpty) {
+          final bestMatch = results.first;
+          targetManga.updateMangaDexId(bestMatch.id);
+          targetManga.updateAltTitles(bestMatch.altTitles);
+        }
+      } catch (_) {}
+    }
+
+    _lastNotificationMessage = "Linked '${pending.formattedTitle}' to '${targetManga.displayTitle}'!";
+    notifyListeners();
+  }
+
   Future<void> addCurrentPendingManga(MangaCollectionData collection) async {
     if (_pendingQueue.isEmpty) return;
 
@@ -335,7 +367,7 @@ class ExtensionServerService extends ChangeNotifier {
 
     String? coverUrl = pending.coverUrl;
     String synopsis = "";
-    List<String> tags = <String>["Manga", "Linked"];
+    List<String> tags = <String>["Manga"];
     String? mangadexId;
     List<String> altTitlesList = <String>[];
 

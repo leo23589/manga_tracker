@@ -72,21 +72,28 @@ class Manga extends ChangeNotifier {
     List<String>? sourceUrls,
     DateTime? createdAt,
     DateTime? lastUpdated,
-  })  : themes = _sortTags(themes),
+  })  : themes = _sortTags(themes, mangadexId),
         altTitles = altTitles ?? <String>[],
         sourceUrls = sourceUrls ?? <String>[],
         createdAt = createdAt ?? DateTime.now(),
         lastUpdated = lastUpdated ?? createdAt ?? DateTime.now();
 
-  bool get isLinked => mangadexId != null || themes.contains("Linked");
+  bool get isLinked => mangadexId != null && mangadexId!.isNotEmpty;
 
   String get displayTitle => title.trim();
 
-  static List<String> _sortTags(List<String> tagsInput) {
+  static List<String> _sortTags(List<String> tagsInput, String? mId) {
     List<String> sorted = List<String>.from(tagsInput);
 
     // Remove "Long Strip" tag (equivalent of Manhwa)
     sorted.removeWhere((t) => t.toLowerCase() == 'long strip');
+
+    // "Linked" tag is ONLY present if equivalent MangaDex ID is set
+    if (mId == null || mId.isEmpty) {
+      sorted.remove("Linked");
+    } else if (!sorted.contains("Linked")) {
+      sorted.add("Linked");
+    }
 
     // Enforce mutual exclusivity: a title can only have Manga OR Manhwa OR Manhua
     if (sorted.contains("Manhwa")) {
@@ -100,6 +107,7 @@ class Manga extends ChangeNotifier {
 
     sorted.sort((String a, String b) {
       int getPriority(String tag) {
+        if (tag == "Linked") return -1; // Highest priority for Linked tag
         if (AppConstants.content.contains(tag)) return 0;
         if (AppConstants.themes.contains(tag)) return 1;
         if (AppConstants.genres.contains(tag)) return 2;
@@ -176,9 +184,7 @@ class Manga extends ChangeNotifier {
 
   void updateMangaDexId(String? id) {
     mangadexId = id;
-    if (id != null && !themes.contains("Linked")) {
-      themes = List<String>.from(themes)..add("Linked");
-    }
+    themes = _sortTags(themes, mangadexId);
     _touch();
   }
 
@@ -212,7 +218,7 @@ class Manga extends ChangeNotifier {
   }
 
   void updateThemes(List<String> newThemes) {
-    themes = _sortTags(newThemes);
+    themes = _sortTags(newThemes, mangadexId);
     _touch();
   }
 
