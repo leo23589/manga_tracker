@@ -38,3 +38,4 @@ flutter:
   assets:
     - assets/icon/app_icon.png
     - assets/images/no_connection.png
+    - assets/images/orange_cat.png
