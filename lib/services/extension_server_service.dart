@@ -196,15 +196,22 @@ class ExtensionServerService extends ChangeNotifier {
           );
         } else {
           _lastNotificationMessage = "'${matchedManga.title}' is already at Chapter ${matchedManga.currentChapter}";
+          NotificationService.showAlreadyUpToDateNotification(
+            title: matchedManga.title,
+            chapter: matchedManga.currentChapter,
+          );
         }
       } else {
         _lastNotificationMessage = "'${matchedManga.title}' is already in your library";
+        NotificationService.showAlreadyUpToDateNotification(
+          title: matchedManga.title,
+          chapter: matchedManga.currentChapter,
+        );
       }
       notifyListeners();
     } else {
       final MangaStatus initialStatus = isChapter ? MangaStatus.reading : MangaStatus.planToRead;
 
-      // Check if already in pending queue
       final int existingIndex = _pendingQueue.indexWhere((p) => normalizeTitle(p.rawTitle) == normIncoming);
       if (existingIndex >= 0) {
         _pendingQueue[existingIndex].chapter = chapter;
@@ -285,5 +292,9 @@ class ExtensionServerService extends ChangeNotifier {
     collection.addManga(newManga);
     _lastNotificationMessage = "Added '${pending.formattedTitle}' (${pending.defaultStatus.label}) to library!";
     notifyListeners();
+  }
+
+  Future<void> quickAddPendingManga(MangaCollectionData collection) async {
+    await addCurrentPendingManga(collection);
   }
 }

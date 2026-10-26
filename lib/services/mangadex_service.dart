@@ -290,8 +290,11 @@ class MangaDexService {
           }
         }
 
-        bool hasContentTag = extractedTags.any((t) => AppConstants.content.contains(t));
-        if (!hasContentTag) {
+        // Clean up "Long Strip" and enforce mutual exclusivity (Manhwa vs Manga)
+        extractedTags.removeWhere((t) => t.toLowerCase() == 'long strip');
+        if (extractedTags.contains('Manhwa')) {
+          extractedTags.remove('Manga');
+        } else if (!extractedTags.any((t) => AppConstants.content.contains(t))) {
           extractedTags.insert(0, "Manga");
         }
 
@@ -312,6 +315,9 @@ class MangaDexService {
   }
 
   static String _matchAppTag(String apiTag) {
+    if (apiTag.toLowerCase() == 'long strip' || apiTag.toLowerCase() == 'webtoon') {
+      return 'Manhwa';
+    }
     for (final String g in AppConstants.genres) {
       if (g.toLowerCase() == apiTag.toLowerCase()) return g;
     }

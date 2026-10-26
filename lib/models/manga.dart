@@ -72,6 +72,20 @@ class Manga extends ChangeNotifier {
 
   static List<String> _sortTags(List<String> tagsInput) {
     List<String> sorted = List<String>.from(tagsInput);
+
+    // Remove "Long Strip" tag (equivalent of Manhwa)
+    sorted.removeWhere((t) => t.toLowerCase() == 'long strip');
+
+    // Enforce mutual exclusivity: a title can only have Manga OR Manhwa OR Manhua
+    if (sorted.contains("Manhwa")) {
+      sorted.remove("Manga");
+      sorted.remove("Manhua");
+    } else if (sorted.contains("Manhua")) {
+      sorted.remove("Manga");
+    } else if (!sorted.any((t) => AppConstants.content.contains(t))) {
+      sorted.insert(0, "Manga");
+    }
+
     sorted.sort((String a, String b) {
       int getPriority(String tag) {
         if (AppConstants.content.contains(tag)) return 0;
