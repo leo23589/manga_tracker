@@ -6,7 +6,6 @@ import 'package:path/path.dart' as path;
 import 'package:provider/provider.dart';
 import '../models/manga.dart';
 import '../widgets/manga_widgets.dart';
-import '../widgets/tag_selector.dart';
 
 class MangaDetailPage extends StatefulWidget {
   final Manga manga;
@@ -201,7 +200,7 @@ class _MangaDetailPageState extends State<MangaDetailPage> {
                       decoration: BoxDecoration(
                         color: const Color(0xFF1E1E28),
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.indigo.withOpacity(0.5)),
+                        border: Border.all(color: Colors.indigo.withAlpha((255 * 0.5).round())),
                       ),
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<MangaStatus>(

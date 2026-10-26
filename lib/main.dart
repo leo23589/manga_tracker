@@ -45,7 +45,7 @@ class MangaApp extends StatelessWidget {
             cardTheme: CardThemeData(
               color: const Color(0xFF1A1A24),
               elevation: 4,
-              shadowColor: Colors.black.withOpacity(0.5),
+              shadowColor: Colors.black.withAlpha((255 * 0.5).round()),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             ),
             appBarTheme: const AppBarTheme(
@@ -55,7 +55,7 @@ class MangaApp extends StatelessWidget {
             ),
             navigationBarTheme: NavigationBarThemeData(
               backgroundColor: const Color(0xFF14141D),
-              indicatorColor: const Color(0xFF6366F1).withOpacity(0.3),
+              indicatorColor: const Color(0xFF6366F1).withAlpha((255 * 0.3).round()),
               labelTextStyle: WidgetStateProperty.all(
                 const TextStyle(fontWeight: FontWeight.w600, fontSize: 12, color: Colors.white70),
               ),
@@ -139,7 +139,7 @@ class _MainScreenState extends State<MainScreen> {
                 child: Container(
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFF6366F1).withOpacity(0.5), width: 1.5),
+                    border: Border.all(color: const Color(0xFF6366F1).withAlpha((255 * 0.5).round()), width: 1.5),
                   ),
                   padding: const EdgeInsets.all(12.0),
                   child: Row(
@@ -160,7 +160,7 @@ class _MainScreenState extends State<MainScreen> {
                           height: 65,
                           margin: const EdgeInsets.only(right: 12.0),
                           decoration: BoxDecoration(
-                            color: Colors.amber.shade900.withOpacity(0.3),
+                            color: Colors.amber.shade900.withAlpha((255 * 0.3).round()),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: const Icon(Icons.extension, color: Colors.amber, size: 28),

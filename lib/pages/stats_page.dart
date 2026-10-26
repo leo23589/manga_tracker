@@ -100,7 +100,7 @@ class StatsPage extends StatelessWidget {
                     icon: const Icon(Icons.upload),
                     label: const Text("Export JSON"),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF6366F1).withOpacity(0.3),
+                      backgroundColor: const Color(0xFF6366F1).withAlpha((255 * 0.3).round()),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
                   ),
@@ -112,7 +112,7 @@ class StatsPage extends StatelessWidget {
                     icon: const Icon(Icons.download),
                     label: const Text("Import JSON"),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF10B981).withOpacity(0.3),
+                      backgroundColor: const Color(0xFF10B981).withAlpha((255 * 0.3).round()),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
                   ),
@@ -201,7 +201,7 @@ class _StatCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFF1A1A24),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withOpacity(0.3), width: 1),
+        border: Border.all(color: color.withAlpha((255 * 0.3).round()), width: 1),
       ),
       child: Column(
         children: <Widget>[

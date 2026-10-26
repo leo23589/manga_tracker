@@ -106,9 +106,9 @@ class MangaListTile extends StatelessWidget {
                               child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                 decoration: BoxDecoration(
-                                  color: _getStatusColor(currentManga.status).withOpacity(0.25),
+                                  color: _getStatusColor(currentManga.status).withAlpha((255 * 0.25).round()),
                                   borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(color: _getStatusColor(currentManga.status).withOpacity(0.6), width: 1),
+                                  border: Border.all(color: _getStatusColor(currentManga.status).withAlpha((255 * 0.6).round()), width: 1),
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
