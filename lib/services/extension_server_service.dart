@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import '../models/manga.dart';
 import 'mangadex_service.dart';
+import 'notification_service.dart';
 
 class PendingMangaUpdate {
   final String rawTitle;
@@ -156,9 +157,14 @@ class ExtensionServerService extends ChangeNotifier {
     }
 
     if (matchedManga != null) {
+      // ONLY update if the incoming chapter is SUPERIOR to current chapter in app!
       if (chapter > matchedManga.currentChapter) {
         matchedManga.updateChapter(chapter);
         _lastNotificationMessage = "Updated '${matchedManga.title}' to Chapter $chapter";
+        NotificationService.showChapterUpdatedNotification(
+          title: matchedManga.title,
+          chapter: chapter,
+        );
       } else {
         _lastNotificationMessage = "'${matchedManga.title}' is already at Chapter ${matchedManga.currentChapter}";
       }
@@ -172,6 +178,10 @@ class ExtensionServerService extends ChangeNotifier {
         url: url,
       );
       notifyListeners();
+      NotificationService.showMangaSuggestionNotification(
+        title: formattedTitle,
+        chapter: chapter,
+      );
       _fetchPendingCoverAndEnglishTitle(formattedTitle);
     }
   }
