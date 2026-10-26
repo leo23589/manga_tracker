@@ -11,6 +11,39 @@ enum MangaSortOption {
   title,
 }
 
+enum MangaStatus {
+  reading,
+  finished,
+  onHold,
+  dropped,
+  planToRead,
+}
+
+extension MangaStatusExtension on MangaStatus {
+  String get label {
+    switch (this) {
+      case MangaStatus.reading:
+        return 'Reading';
+      case MangaStatus.finished:
+        return 'Finished';
+      case MangaStatus.onHold:
+        return 'On Hold';
+      case MangaStatus.dropped:
+        return 'Dropped';
+      case MangaStatus.planToRead:
+        return 'Plan to Read';
+    }
+  }
+
+  static MangaStatus fromString(String? val) {
+    if (val == null) return MangaStatus.reading;
+    return MangaStatus.values.firstWhere(
+      (e) => e.label.toLowerCase() == val.toLowerCase() || e.name.toLowerCase() == val.toLowerCase(),
+      orElse: () => MangaStatus.reading,
+    );
+  }
+}
+
 class Manga extends ChangeNotifier {
   String title;
   int currentChapter;
@@ -18,6 +51,7 @@ class Manga extends ChangeNotifier {
   String synopsis;
   List<String> themes;
   int rating;
+  MangaStatus status;
   
   final DateTime createdAt;
   DateTime lastUpdated;
@@ -29,6 +63,7 @@ class Manga extends ChangeNotifier {
     this.synopsis = "",
     List<String> themes = const <String>[],
     this.rating = 0,
+    this.status = MangaStatus.reading,
     DateTime? createdAt,
     DateTime? lastUpdated,
   })  : themes = _sortTags(themes),
@@ -52,7 +87,6 @@ class Manga extends ChangeNotifier {
     return sorted;
   }
 
-  // Convertir un Manga en Map (pour le JSON)
   Map<String, dynamic> toMap() {
     return {
       'title': title,
@@ -61,12 +95,12 @@ class Manga extends ChangeNotifier {
       'synopsis': synopsis,
       'themes': themes,
       'rating': rating,
+      'status': status.label,
       'createdAt': createdAt.toIso8601String(),
       'lastUpdated': lastUpdated.toIso8601String(),
     };
   }
 
-  // Créer un Manga à partir d'un Map
   factory Manga.fromMap(Map<String, dynamic> map) {
     return Manga(
       title: map['title'],
@@ -75,6 +109,7 @@ class Manga extends ChangeNotifier {
       synopsis: map['synopsis'] ?? '',
       themes: List<String>.from(map['themes'] ?? <String>[]),
       rating: map['rating'] ?? 0,
+      status: MangaStatusExtension.fromString(map['status']),
       createdAt: DateTime.parse(map['createdAt']),
       lastUpdated: DateTime.parse(map['lastUpdated']),
     );
@@ -102,6 +137,11 @@ class Manga extends ChangeNotifier {
       rating = newRating;
       _touch();
     }
+  }
+
+  void updateStatus(MangaStatus newStatus) {
+    status = newStatus;
+    _touch();
   }
 
   void updateSynopsis(String newSynopsis) {
@@ -155,20 +195,17 @@ class MangaCollectionData extends ChangeNotifier {
     return sortedList;
   }
 
-  // Fichier de sauvegarde
   Future<File> get _localFile async {
     final directory = await getApplicationDocumentsDirectory();
     return File('${directory.path}/mangas.json');
   }
 
-  // Sauvegarder les données
   Future<void> _saveData() async {
     final file = await _localFile;
     final String jsonString = jsonEncode(_mangas.map((m) => m.toMap()).toList());
     await file.writeAsString(jsonString);
   }
 
-  // Charger les données
   Future<void> _loadData() async {
     try {
       final file = await _localFile;
@@ -183,7 +220,6 @@ class MangaCollectionData extends ChangeNotifier {
         
         notifyListeners();
       } else {
-        // Données par défaut si premier lancement
         _mangas = [
           Manga(
             title: "One Piece",
@@ -191,6 +227,7 @@ class MangaCollectionData extends ChangeNotifier {
             synopsis: "Monkey D. Luffy, a boy whose body gained the properties of rubber...",
             themes: ["Adventure", "Fantasy", "Action", "Comedy", "Manga"],
             rating: 9,
+            status: MangaStatus.reading,
           )..addListener(_saveData),
         ];
         await _saveData();
@@ -201,7 +238,6 @@ class MangaCollectionData extends ChangeNotifier {
     }
   }
 
-  // Importer depuis un JSON externe (avec extraction des images Base64)
   Future<bool> importData(String jsonString) async {
     try {
       final List<dynamic> jsonList = jsonDecode(jsonString);
@@ -251,7 +287,6 @@ class MangaCollectionData extends ChangeNotifier {
     }
   }
 
-  // Récupérer le contenu JSON actuel pour l'export (inclut les images en Base64)
   Future<String> getExportJson() async {
     final List<Map<String, dynamic>> exportList = <Map<String, dynamic>>[];
 

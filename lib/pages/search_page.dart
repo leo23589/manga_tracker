@@ -22,6 +22,7 @@ class _SearchPageState extends State<SearchPage> {
   List<String> _filterTags = <String>[];
   int _minRating = 0;
   bool _showAdvancedFilters = false;
+  MangaStatus? _selectedStatusFilter;
 
   // MangaDex Search State
   final TextEditingController _mangadexSearchController = TextEditingController();
@@ -121,8 +122,9 @@ class _SearchPageState extends State<SearchPage> {
       final bool matchesText = manga.title.toLowerCase().contains(_localSearchController.text.toLowerCase());
       final bool matchesTags = _filterTags.isEmpty || _filterTags.every((String tag) => manga.themes.contains(tag));
       final bool matchesRating = manga.rating >= _minRating;
+      final bool matchesStatus = _selectedStatusFilter == null || manga.status == _selectedStatusFilter;
 
-      return matchesText && matchesTags && matchesRating;
+      return matchesText && matchesTags && matchesRating && matchesStatus;
     }).toList();
 
     return Scaffold(
@@ -180,15 +182,43 @@ class _SearchPageState extends State<SearchPage> {
                         onChanged: (String val) => setState(() {}),
                       ),
                       const SizedBox(height: 10),
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            FilterChip(
+                              label: const Text("All Statuses"),
+                              selected: _selectedStatusFilter == null,
+                              onSelected: (_) => setState(() => _selectedStatusFilter = null),
+                            ),
+                            const SizedBox(width: 8),
+                            ...MangaStatus.values.map((status) {
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 8.0),
+                                child: FilterChip(
+                                  label: Text(status.label),
+                                  selected: _selectedStatusFilter == status,
+                                  onSelected: (selected) {
+                                    setState(() {
+                                      _selectedStatusFilter = selected ? status : null;
+                                    });
+                                  },
+                                ),
+                              );
+                            }),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 10),
                       GestureDetector(
                         onTap: () => setState(() => _showAdvancedFilters = !_showAdvancedFilters),
                         child: Row(
                           children: <Widget>[
-                            Icon(_showAdvancedFilters ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down, color: Colors.indigo),
+                            Icon(_showAdvancedFilters ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down, color: Colors.indigoAccent),
                             const SizedBox(width: 8),
                             Text(
                               "Advanced Filters (${_filterTags.length + (_minRating > 0 ? 1 : 0)} active)",
-                              style: const TextStyle(color: Colors.indigo, fontWeight: FontWeight.bold),
+                              style: const TextStyle(color: Colors.indigoAccent, fontWeight: FontWeight.bold),
                             ),
                           ],
                         ),

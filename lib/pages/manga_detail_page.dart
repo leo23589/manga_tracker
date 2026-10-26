@@ -145,7 +145,7 @@ class _MangaDetailPageState extends State<MangaDetailPage> {
       body: Consumer<Manga>(
         builder: (BuildContext context, Manga manga, Widget? child) {
           final String? displayPath = _isEditing ? _temporaryImagePath : manga.imagePath;
-          
+
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16.0),
             child: Column(
@@ -168,7 +168,7 @@ class _MangaDetailPageState extends State<MangaDetailPage> {
                             width: 200,
                             height: 300,
                             decoration: BoxDecoration(
-                              color: Colors.black26,
+                              color: Colors.black38,
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: const Icon(Icons.camera_alt, size: 50, color: Colors.white70),
@@ -184,33 +184,80 @@ class _MangaDetailPageState extends State<MangaDetailPage> {
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
                         decoration: const InputDecoration(hintText: "Manga Title", border: InputBorder.none))
-                    : Text(manga.title, style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                    : Center(
+                        child: Text(
+                          manga.title,
+                          style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: <Widget>[
+                    const Text("Reading Status:", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E1E28),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.indigo.withOpacity(0.5)),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<MangaStatus>(
+                          value: manga.status,
+                          dropdownColor: const Color(0xFF1E1E28),
+                          onChanged: (MangaStatus? newStatus) {
+                            if (newStatus != null) {
+                              manga.updateStatus(newStatus);
+                            }
+                          },
+                          items: MangaStatus.values.map((MangaStatus status) {
+                            return DropdownMenuItem<MangaStatus>(
+                              value: status,
+                              child: Text(
+                                status.label,
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 16),
-                Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: <Widget>[
-                  const Text("Current Chapter:", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
-                  ChapterInputWidget(manga: manga, onChapterChanged: (int val) => manga.updateChapter(val)),
-                ]),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: <Widget>[
+                    const Text("Current Chapter:", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+                    ChapterInputWidget(manga: manga, onChapterChanged: (int val) => manga.updateChapter(val)),
+                  ],
+                ),
                 const SizedBox(height: 16),
-                Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: <Widget>[
-                  const Text("Rating:", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
-                  RatingInputWidget(currentRating: manga.rating, onRatingChanged: (int val) => manga.updateRating(val), enabled: _isEditing),
-                ]),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: <Widget>[
+                    const Text("Rating:", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+                    RatingInputWidget(currentRating: manga.rating, onRatingChanged: (int val) => manga.updateRating(val), enabled: _isEditing),
+                  ],
+                ),
                 const SizedBox(height: 24),
-                Text("Synopsis", style: Theme.of(context).textTheme.headlineSmall),
+                Text("Synopsis", style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 _isEditing
                     ? TextField(controller: _synopsisEditController, maxLines: null, decoration: const InputDecoration(border: OutlineInputBorder(), hintText: "Write synopsis here..."))
                     : Text(manga.synopsis.isEmpty ? "No synopsis provided." : manga.synopsis, style: Theme.of(context).textTheme.bodyLarge),
                 const SizedBox(height: 24),
-                Text("Themes", style: Theme.of(context).textTheme.headlineSmall),
+                Text("Themes", style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 _isEditing
                     ? TagSelector(selectedTags: _temporarySelectedThemes, onSelectionChanged: (List<String> newTags) => setState(() => _temporarySelectedThemes = newTags), enabled: true)
                     : DisplayTagList(
                         tags: manga.themes,
-                        contentTagColor: Colors.red.shade700,
-                        themeTagColor: Colors.purple.shade700,
-                        genreTagColor: Colors.blue.shade700,
+                        contentTagColor: Colors.red.shade900,
+                        themeTagColor: Colors.purple.shade900,
+                        genreTagColor: Colors.blue.shade900,
                         textColor: Colors.white,
                       ),
               ],

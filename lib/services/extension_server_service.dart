@@ -9,12 +9,14 @@ class PendingMangaUpdate {
   final String formattedTitle;
   final int chapter;
   final String? url;
+  String? coverUrl;
 
   PendingMangaUpdate({
     required this.rawTitle,
     required this.formattedTitle,
     required this.chapter,
     this.url,
+    this.coverUrl,
   });
 }
 
@@ -163,7 +165,6 @@ class ExtensionServerService extends ChangeNotifier {
       _pendingManga = null;
       notifyListeners();
     } else {
-      // Manga not in collection -> set as pending so UI prompts user to Quick Add!
       _pendingManga = PendingMangaUpdate(
         rawTitle: rawTitle,
         formattedTitle: formattedTitle,
@@ -171,7 +172,18 @@ class ExtensionServerService extends ChangeNotifier {
         url: url,
       );
       notifyListeners();
+      _fetchPendingCover(formattedTitle);
     }
+  }
+
+  Future<void> _fetchPendingCover(String title) async {
+    try {
+      final results = await MangaDexService.searchManga(title);
+      if (results.isNotEmpty && _pendingManga != null && _pendingManga!.formattedTitle == title) {
+        _pendingManga!.coverUrl = results.first.coverUrl;
+        notifyListeners();
+      }
+    } catch (_) {}
   }
 
   Future<void> quickAddPendingManga(MangaCollectionData collection) async {
@@ -179,8 +191,7 @@ class ExtensionServerService extends ChangeNotifier {
 
     final PendingMangaUpdate pending = _pendingManga!;
 
-    // Attempt to fetch details/cover art from MangaDex in background
-    String? coverUrl;
+    String? coverUrl = pending.coverUrl;
     String synopsis = "";
     List<String> tags = <String>["Manga"];
 
@@ -188,7 +199,7 @@ class ExtensionServerService extends ChangeNotifier {
       final results = await MangaDexService.searchManga(pending.formattedTitle);
       if (results.isNotEmpty) {
         final bestMatch = results.first;
-        coverUrl = bestMatch.coverUrl;
+        coverUrl = await MangaDexService.downloadCoverImageLocally(bestMatch.coverUrl);
         synopsis = bestMatch.synopsis;
         tags = bestMatch.tags;
       }
@@ -201,6 +212,7 @@ class ExtensionServerService extends ChangeNotifier {
       synopsis: synopsis,
       themes: tags,
       rating: 0,
+      status: MangaStatus.reading,
     );
 
     collection.addManga(newManga);

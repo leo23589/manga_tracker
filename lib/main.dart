@@ -5,6 +5,7 @@ import 'pages/manga_list_page.dart';
 import 'pages/search_page.dart';
 import 'pages/stats_page.dart';
 import 'services/extension_server_service.dart';
+import 'widgets/manga_cover_image.dart';
 
 void main() {
   runApp(const MangaApp());
@@ -27,12 +28,38 @@ class MangaApp extends StatelessWidget {
       builder: (BuildContext context, Widget? child) {
         return MaterialApp(
           debugShowCheckedModeBanner: false,
-          theme: ThemeData(
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: Colors.indigo,
-              brightness: Brightness.dark,
-            ),
+          themeMode: ThemeMode.dark,
+          darkTheme: ThemeData(
             useMaterial3: true,
+            brightness: Brightness.dark,
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: const Color(0xFF6366F1),
+              brightness: Brightness.dark,
+              surface: const Color(0xFF121218),
+              surfaceContainerHighest: const Color(0xFF1E1E28),
+              onSurface: const Color(0xFFF3F4F6),
+              primary: const Color(0xFF818CF8),
+              primaryContainer: const Color(0xFF1E1E2A),
+            ),
+            scaffoldBackgroundColor: const Color(0xFF0F0F14),
+            cardTheme: CardTheme(
+              color: const Color(0xFF1A1A24),
+              elevation: 4,
+              shadowColor: Colors.black.withOpacity(0.5),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            ),
+            appBarTheme: const AppBarTheme(
+              backgroundColor: Color(0xFF161620),
+              foregroundColor: Color(0xFFF3F4F6),
+              elevation: 0,
+            ),
+            navigationBarTheme: NavigationBarThemeData(
+              backgroundColor: const Color(0xFF14141D),
+              indicatorColor: const Color(0xFF6366F1).withOpacity(0.3),
+              labelTextStyle: WidgetStateProperty.all(
+                const TextStyle(fontWeight: FontWeight.w600, fontSize: 12, color: Colors.white70),
+              ),
+            ),
           ),
           home: const MainScreen(),
         );
@@ -86,7 +113,7 @@ class _MainScreenState extends State<MainScreen> {
             SnackBar(
               content: Text(message),
               behavior: SnackBarBehavior.floating,
-              backgroundColor: Colors.indigo,
+              backgroundColor: const Color(0xFF6366F1),
             ),
           );
           serverService.clearNotificationMessage();
@@ -106,15 +133,38 @@ class _MainScreenState extends State<MainScreen> {
               right: 16,
               bottom: 16,
               child: Material(
-                elevation: 8,
-                borderRadius: BorderRadius.circular(12),
-                color: Colors.indigo.shade900,
-                child: Padding(
+                elevation: 12,
+                borderRadius: BorderRadius.circular(16),
+                color: const Color(0xFF1E1B4B),
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFF6366F1).withOpacity(0.5), width: 1.5),
+                  ),
                   padding: const EdgeInsets.all(12.0),
                   child: Row(
                     children: [
-                      const Icon(Icons.extension, color: Colors.amber, size: 28),
-                      const SizedBox(width: 12),
+                      if (pending.coverUrl != null && pending.coverUrl!.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 12.0),
+                          child: MangaCoverImage(
+                            imagePath: pending.coverUrl,
+                            width: 45,
+                            height: 65,
+                            borderRadius: 8,
+                          ),
+                        )
+                      else
+                        Container(
+                          width: 45,
+                          height: 65,
+                          margin: const EdgeInsets.only(right: 12.0),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.shade900.withOpacity(0.3),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(Icons.extension, color: Colors.amber, size: 28),
+                        ),
                       Expanded(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
@@ -122,14 +172,16 @@ class _MainScreenState extends State<MainScreen> {
                           children: [
                             const Text(
                               "Extension Detected Reading",
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.amber),
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.amberAccent),
                             ),
+                            const SizedBox(height: 2),
                             Text(
                               "${pending.formattedTitle} (Ch. ${pending.chapter})",
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
+                            const SizedBox(height: 2),
                             const Text(
                               "Not in your library yet",
                               style: TextStyle(fontSize: 11, color: Colors.white70),
@@ -140,7 +192,7 @@ class _MainScreenState extends State<MainScreen> {
                       const SizedBox(width: 8),
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.indigo,
+                          backgroundColor: const Color(0xFF6366F1),
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                         ),
@@ -150,7 +202,7 @@ class _MainScreenState extends State<MainScreen> {
                         child: const Text("Quick Add", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.close, size: 18),
+                        icon: const Icon(Icons.close, size: 18, color: Colors.white70),
                         onPressed: () {
                           serverService.clearPendingManga();
                         },

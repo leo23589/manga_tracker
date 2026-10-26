@@ -16,11 +16,11 @@ class StatsPage extends StatelessWidget {
       final file = File('${directory.path}/manga_backup.json');
       await file.writeAsString(json);
       
-      await Share.shareXFiles([XFile(file.path)], text: 'Ma sauvegarde Manga Tracker');
+      await Share.shareXFiles([XFile(file.path)], text: 'Manga Tracker Backup');
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur lors de l\'exportation : $e')),
+          SnackBar(content: Text('Export Error: $e')),
         );
       }
     }
@@ -41,7 +41,7 @@ class StatsPage extends StatelessWidget {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(success ? 'Importation réussie !' : 'Fichier de sauvegarde invalide.'),
+              content: Text(success ? 'Import successful!' : 'Invalid backup file.'),
               backgroundColor: success ? Colors.green : Colors.red,
             ),
           );
@@ -50,7 +50,7 @@ class StatsPage extends StatelessWidget {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur lors de l\'importation : $e')),
+          SnackBar(content: Text('Import Error: $e')),
         );
       }
     }
@@ -63,6 +63,9 @@ class StatsPage extends StatelessWidget {
 
     final int totalMangas = mangas.length;
     final int totalChapters = mangas.fold<int>(0, (int sum, Manga item) => sum + item.currentChapter);
+
+    final int readingCount = mangas.where((Manga m) => m.status == MangaStatus.reading).length;
+    final int finishedCount = mangas.where((Manga m) => m.status == MangaStatus.finished).length;
 
     final int mangaCount = mangas.where((Manga manga) => manga.themes.contains("Manga")).length;
     final int manhwaCount = mangas.where((Manga manga) => manga.themes.contains("Manhwa")).length;
@@ -78,7 +81,7 @@ class StatsPage extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Statistics"),
+        title: const Text("Statistics & Backup"),
         backgroundColor: Theme.of(context).colorScheme.primaryContainer,
       ),
       body: SingleChildScrollView(
@@ -86,18 +89,18 @@ class StatsPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            // Section Sauvegarde
-            const Text("Sauvegarde & Restauration", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
+            // Backup Section
+            const Text("Backup & Restore", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: () => _exportData(context, mangaCollection),
                     icon: const Icon(Icons.upload),
-                    label: const Text("Exporter"),
+                    label: const Text("Export JSON"),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.indigo.withAlpha(50),
+                      backgroundColor: const Color(0xFF6366F1).withOpacity(0.3),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
                   ),
@@ -107,40 +110,48 @@ class StatsPage extends StatelessWidget {
                   child: ElevatedButton.icon(
                     onPressed: () => _importData(context, mangaCollection),
                     icon: const Icon(Icons.download),
-                    label: const Text("Importer"),
+                    label: const Text("Import JSON"),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green.withAlpha(50),
+                      backgroundColor: Colors.emerald.withOpacity(0.3),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 30),
+            const SizedBox(height: 28),
             
-            const Text("Données Globales", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
+            const Text("Global Statistics", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
             Row(
               children: <Widget>[
-                Expanded(child: _StatCard(title: "Titles read", value: "$totalMangas", icon: Icons.book, color: Colors.blue)),
+                Expanded(child: _StatCard(title: "Titles in Library", value: "$totalMangas", icon: Icons.book, color: const Color(0xFF818CF8))),
                 const SizedBox(width: 10),
-                Expanded(child: _StatCard(title: "Chapters read", value: "$totalChapters", icon: Icons.library_books, color: Colors.green)),
+                Expanded(child: _StatCard(title: "Chapters Read", value: "$totalChapters", icon: Icons.library_books, color: const Color(0xFF34D399))),
               ],
             ),
             const SizedBox(height: 10),
             Row(
               children: <Widget>[
-                Expanded(child: _StatCard(title: "Mangas", value: "$mangaCount", icon: Icons.menu_book, color: Colors.purple)),
+                Expanded(child: _StatCard(title: "Currently Reading", value: "$readingCount", icon: Icons.auto_stories, color: const Color(0xFF38BDF8))),
                 const SizedBox(width: 10),
-                Expanded(child: _StatCard(title: "Manhwas", value: "$manhwaCount", icon: Icons.auto_stories, color: Colors.orange)),
+                Expanded(child: _StatCard(title: "Finished Reading", value: "$finishedCount", icon: Icons.check_circle, color: const Color(0xFF10B981))),
               ],
             ),
-            const SizedBox(height: 30),
-            const Text("Favorite Genres", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
+            Row(
+              children: <Widget>[
+                Expanded(child: _StatCard(title: "Mangas", value: "$mangaCount", icon: Icons.menu_book, color: const Color(0xFFA78BFA))),
+                const SizedBox(width: 10),
+                Expanded(child: _StatCard(title: "Manhwas", value: "$manhwaCount", icon: Icons.style, color: const Color(0xFFFB923C))),
+              ],
+            ),
+            const SizedBox(height: 28),
+            const Text("Favorite Genres & Themes", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
 
             if (topTags.isEmpty)
-              const Text("Add themes to your mangas to see stats!")
+              const Text("Add genres or themes to your mangas to see stats!")
             else
               ...topTags.map<Widget>((MapEntry<String, int> entry) {
                 final double percent = entry.value / (topTags.first.value == 0 ? 1 : topTags.first.value);
@@ -153,14 +164,14 @@ class StatsPage extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: <Widget>[
                           Text(entry.key, style: const TextStyle(fontWeight: FontWeight.bold)),
-                          Text("${entry.value} mangas"),
+                          Text("${entry.value} mangas", style: const TextStyle(color: Colors.white70)),
                         ],
                       ),
-                      const SizedBox(height: 5),
+                      const SizedBox(height: 6),
                       LinearProgressIndicator(
                         value: percent,
-                        backgroundColor: Colors.grey.shade800,
-                        color: Colors.indigoAccent,
+                        backgroundColor: const Color(0xFF1E1E28),
+                        color: const Color(0xFF6366F1),
                         minHeight: 8,
                         borderRadius: BorderRadius.circular(4),
                       )
@@ -188,15 +199,17 @@ class _StatCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(12),
+        color: const Color(0xFF1A1A24),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withOpacity(0.3), width: 1),
       ),
       child: Column(
         children: <Widget>[
-          Icon(icon, size: 30, color: color),
+          Icon(icon, size: 28, color: color),
           const SizedBox(height: 8),
           Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-          Text(title, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+          const SizedBox(height: 2),
+          Text(title, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12), textAlign: TextAlign.center),
         ],
       ),
     );
