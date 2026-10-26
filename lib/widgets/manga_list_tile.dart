@@ -73,7 +73,7 @@ class MangaListTile extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: <Widget>[
                             Text(
-                              currentManga.title,
+                              currentManga.displayTitle,
                               style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,

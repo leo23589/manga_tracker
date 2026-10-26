@@ -52,6 +52,7 @@ class Manga extends ChangeNotifier {
   List<String> themes;
   int rating;
   MangaStatus status;
+  String? mangadexId;
   
   final DateTime createdAt;
   DateTime lastUpdated;
@@ -64,11 +65,24 @@ class Manga extends ChangeNotifier {
     List<String> themes = const <String>[],
     this.rating = 0,
     this.status = MangaStatus.reading,
+    this.mangadexId,
     DateTime? createdAt,
     DateTime? lastUpdated,
   })  : themes = _sortTags(themes),
         createdAt = createdAt ?? DateTime.now(),
         lastUpdated = lastUpdated ?? createdAt ?? DateTime.now();
+
+  bool get isLinked => mangadexId != null || themes.contains("Linked");
+
+  String get displayTitle {
+    final clean = title.trim();
+    if (isLinked) {
+      if (!clean.endsWith('\$')) {
+        return '$clean \$';
+      }
+    }
+    return clean;
+  }
 
   static List<String> _sortTags(List<String> tagsInput) {
     List<String> sorted = List<String>.from(tagsInput);
@@ -110,6 +124,7 @@ class Manga extends ChangeNotifier {
       'themes': themes,
       'rating': rating,
       'status': status.label,
+      'mangadexId': mangadexId,
       'createdAt': createdAt.toIso8601String(),
       'lastUpdated': lastUpdated.toIso8601String(),
     };
@@ -124,6 +139,7 @@ class Manga extends ChangeNotifier {
       themes: List<String>.from(map['themes'] ?? <String>[]),
       rating: map['rating'] ?? 0,
       status: MangaStatusExtension.fromString(map['status']),
+      mangadexId: map['mangadexId'],
       createdAt: DateTime.parse(map['createdAt']),
       lastUpdated: DateTime.parse(map['lastUpdated']),
     );
@@ -132,6 +148,14 @@ class Manga extends ChangeNotifier {
   void _touch() {
     lastUpdated = DateTime.now();
     notifyListeners();
+  }
+
+  void updateMangaDexId(String? id) {
+    mangadexId = id;
+    if (id != null && !themes.contains("Linked")) {
+      themes = List<String>.from(themes)..add("Linked");
+    }
+    _touch();
   }
 
   void updateImage(String? newPath) {

@@ -147,6 +147,7 @@ class ExtensionServerService extends ChangeNotifier {
 
   static String normalizeTitle(String title) {
     return title
+        .replaceAll('\$', '')
         .replaceAll('-', ' ')
         .replaceAll('_', ' ')
         .replaceAll(RegExp(r'\s+'), ' ')
@@ -169,12 +170,25 @@ class ExtensionServerService extends ChangeNotifier {
     required bool isChapter,
     required String? url,
     required MangaCollectionData collection,
-  }) {
+  }) async {
     final String normIncoming = normalizeTitle(rawTitle);
     final String formattedTitle = formatTitleFromSlug(rawTitle);
 
+    String? incomingMangaDexId;
+    if (url != null && url.contains('mangadex.org')) {
+      final match = RegExp(r'/(?:title|manga|chapter)/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', caseSensitive: false).firstMatch(url);
+      if (match != null) {
+        incomingMangaDexId = match.group(1);
+      }
+    }
+
+    // 1. Direct Search in Local Collection (by Title OR MangaDex ID)
     Manga? matchedManga;
     for (final Manga m in collection.mangas) {
+      if (incomingMangaDexId != null && m.mangadexId == incomingMangaDexId) {
+        matchedManga = m;
+        break;
+      }
       final String normLocal = normalizeTitle(m.title);
       if (normLocal == normIncoming || normLocal.contains(normIncoming) || normIncoming.contains(normLocal)) {
         matchedManga = m;
@@ -182,6 +196,31 @@ class ExtensionServerService extends ChangeNotifier {
       }
     }
 
+    // 2. Search MangaDex in background to check if this corresponds to an existing linked item
+    if (matchedManga == null) {
+      try {
+        final results = await MangaDexService.searchManga(formattedTitle);
+        if (results.isNotEmpty) {
+          final bestMatch = results.first;
+          final String normOfficial = normalizeTitle(bestMatch.title);
+
+          for (final Manga m in collection.mangas) {
+            if (m.mangadexId == bestMatch.id) {
+              matchedManga = m;
+              break;
+            }
+            final String normLocal = normalizeTitle(m.title);
+            if (normLocal == normOfficial || normLocal.contains(normOfficial) || normOfficial.contains(normLocal)) {
+              matchedManga = m;
+              m.updateMangaDexId(bestMatch.id);
+              break;
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 3. Handle Chapter Update vs Suggestion
     if (matchedManga != null) {
       if (isChapter) {
         if (chapter > matchedManga.currentChapter) {
@@ -189,22 +228,22 @@ class ExtensionServerService extends ChangeNotifier {
           if (matchedManga.status == MangaStatus.planToRead) {
             matchedManga.updateStatus(MangaStatus.reading);
           }
-          _lastNotificationMessage = "Updated '${matchedManga.title}' to Chapter $chapter";
+          _lastNotificationMessage = "Updated '${matchedManga.displayTitle}' to Chapter $chapter";
           NotificationService.showChapterUpdatedNotification(
-            title: matchedManga.title,
+            title: matchedManga.displayTitle,
             chapter: chapter,
           );
         } else {
-          _lastNotificationMessage = "'${matchedManga.title}' is already at Chapter ${matchedManga.currentChapter}";
+          _lastNotificationMessage = "'${matchedManga.displayTitle}' is already at Chapter ${matchedManga.currentChapter}";
           NotificationService.showAlreadyUpToDateNotification(
-            title: matchedManga.title,
+            title: matchedManga.displayTitle,
             chapter: matchedManga.currentChapter,
           );
         }
       } else {
-        _lastNotificationMessage = "'${matchedManga.title}' is already in your library";
+        _lastNotificationMessage = "'${matchedManga.displayTitle}' is already in your library";
         NotificationService.showAlreadyUpToDateNotification(
-          title: matchedManga.title,
+          title: matchedManga.displayTitle,
           chapter: matchedManga.currentChapter,
         );
       }
@@ -267,11 +306,13 @@ class ExtensionServerService extends ChangeNotifier {
     String? coverUrl = pending.coverUrl;
     String synopsis = "";
     List<String> tags = <String>["Manga", "Linked"];
+    String? mangadexId;
 
     try {
       final results = await MangaDexService.searchManga(pending.formattedTitle);
       if (results.isNotEmpty) {
         final bestMatch = results.first;
+        mangadexId = bestMatch.id;
         coverUrl = await MangaDexService.downloadCoverImageLocally(bestMatch.coverUrl);
         synopsis = bestMatch.synopsis;
         tags = List<String>.from(bestMatch.tags);
@@ -287,10 +328,11 @@ class ExtensionServerService extends ChangeNotifier {
       themes: tags,
       rating: 0,
       status: pending.defaultStatus,
+      mangadexId: mangadexId,
     );
 
     collection.addManga(newManga);
-    _lastNotificationMessage = "Added '${pending.formattedTitle}' (${pending.defaultStatus.label}) to library!";
+    _lastNotificationMessage = "Added '${newManga.displayTitle}' (${pending.defaultStatus.label}) to library!";
     notifyListeners();
   }
 
