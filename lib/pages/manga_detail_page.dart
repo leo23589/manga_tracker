@@ -5,6 +5,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import 'package:provider/provider.dart';
 import '../models/manga.dart';
+import '../services/mangadex_service.dart';
+import '../widgets/dialogs/mangadex_autofill_dialog.dart';
 import '../widgets/manga_widgets.dart';
 
 class MangaDetailPage extends StatefulWidget {
@@ -51,6 +53,92 @@ class _MangaDetailPageState extends State<MangaDetailPage> {
     setState(() {
       _temporaryImagePath = localPath;
     });
+  }
+
+  void _showQuickCoverOptionsSheet(Manga manga) {
+    showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext sheetContext) {
+        return Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text("Change Cover Image", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: const Icon(Icons.photo_library, color: Colors.indigoAccent),
+                title: const Text("Pick from Gallery"),
+                onTap: () async {
+                  Navigator.pop(sheetContext);
+                  await _updateImage();
+                  if (_temporaryImagePath != null) {
+                    manga.updateImage(_temporaryImagePath);
+                  }
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.travel_explore, color: Colors.indigoAccent),
+                title: const Text("Search & Set Cover from MangaDex"),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  showMangaDexAutofillDialog(
+                    parentContext: context,
+                    initialQuery: manga.title,
+                    onSelect: (result) async {
+                      final localPath = await MangaDexService.downloadCoverImageLocally(result.coverUrl);
+                      if (localPath != null) {
+                        manga.updateImage(localPath);
+                        setState(() => _temporaryImagePath = localPath);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Cover image updated!'), backgroundColor: Colors.green),
+                          );
+                        }
+                      }
+                    },
+                  );
+                },
+              ),
+              if (manga.imagePath != null)
+                ListTile(
+                  leading: const Icon(Icons.delete, color: Colors.redAccent),
+                  title: const Text("Remove Cover", style: TextStyle(color: Colors.redAccent)),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    manga.updateImage(null);
+                    setState(() => _temporaryImagePath = null);
+                  },
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _linkWithMangaDex(Manga manga) {
+    showMangaDexAutofillDialog(
+      parentContext: context,
+      initialQuery: manga.title,
+      onSelect: (result) async {
+        final localPath = await MangaDexService.downloadCoverImageLocally(result.coverUrl);
+        manga.updateTitle(result.title);
+        manga.updateSynopsis(result.synopsis);
+        manga.updateThemes(result.tags);
+        if (localPath != null) {
+          manga.updateImage(localPath);
+        }
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Linked "${result.title}" with MangaDex!'), backgroundColor: Colors.green),
+          );
+        }
+      },
+    );
   }
 
   void _showDeleteConfirmationDialog(Manga manga) {
@@ -129,15 +217,27 @@ class _MangaDetailPageState extends State<MangaDetailPage> {
               onSelected: (String result) {
                 if (result == 'edit_details') {
                   _enterEditMode();
+                } else if (result == 'link_mangadex') {
+                  _linkWithMangaDex(widget.manga);
                 } else if (result == 'delete') {
                   _showDeleteConfirmationDialog(widget.manga);
                 }
               },
               itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-                const PopupMenuItem<String>(value: 'edit_details', child: Row(children: <Widget>[Icon(Icons.edit, size: 20), SizedBox(width: 8), Text('Edit Details')])),
-                const PopupMenuItem<String>(value: 'delete', child: Row(children: <Widget>[Icon(Icons.delete, color: Colors.red, size: 20), SizedBox(width: 8), Text('Delete Manga', style: TextStyle(color: Colors.red))])),
+                const PopupMenuItem<String>(
+                  value: 'edit_details',
+                  child: Row(children: <Widget>[Icon(Icons.edit, size: 20), SizedBox(width: 8), Text('Edit Details')]),
+                ),
+                const PopupMenuItem<String>(
+                  value: 'link_mangadex',
+                  child: Row(children: <Widget>[Icon(Icons.auto_awesome, color: Colors.indigoAccent, size: 20), SizedBox(width: 8), Text('Link with MangaDex')]),
+                ),
+                const PopupMenuItem<String>(
+                  value: 'delete',
+                  child: Row(children: <Widget>[Icon(Icons.delete, color: Colors.red, size: 20), SizedBox(width: 8), Text('Delete Manga', style: TextStyle(color: Colors.red))]),
+                ),
               ],
-              icon: const Icon(Icons.edit),
+              icon: const Icon(Icons.more_vert),
             ),
         ],
       ),
@@ -152,7 +252,7 @@ class _MangaDetailPageState extends State<MangaDetailPage> {
               children: <Widget>[
                 Center(
                   child: GestureDetector(
-                    onTap: _isEditing ? _updateImage : null,
+                    onTap: _isEditing ? _updateImage : () => _showQuickCoverOptionsSheet(manga),
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
@@ -162,16 +262,19 @@ class _MangaDetailPageState extends State<MangaDetailPage> {
                           height: 300,
                           borderRadius: 12.0,
                         ),
-                        if (_isEditing)
-                          Container(
-                            width: 200,
-                            height: 300,
-                            decoration: BoxDecoration(
-                              color: Colors.black38,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(Icons.camera_alt, size: 50, color: Colors.white70),
+                        Container(
+                          width: 200,
+                          height: 300,
+                          decoration: BoxDecoration(
+                            color: _isEditing ? Colors.black38 : Colors.transparent,
+                            borderRadius: BorderRadius.circular(12),
                           ),
+                          child: Icon(
+                            _isEditing ? Icons.camera_alt : Icons.edit,
+                            size: _isEditing ? 50 : 28,
+                            color: Colors.white.withAlpha(_isEditing ? 200 : 80),
+                          ),
+                        ),
                       ],
                     ),
                   ),

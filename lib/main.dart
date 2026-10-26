@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'models/manga.dart';
 import 'pages/manga_list_page.dart';
 import 'pages/search_page.dart';
+import 'pages/splash_screen.dart';
 import 'pages/stats_page.dart';
 import 'services/extension_server_service.dart';
 import 'widgets/manga_cover_image.dart';
@@ -61,7 +62,7 @@ class MangaApp extends StatelessWidget {
               ),
             ),
           ),
-          home: const MainScreen(),
+          home: const SplashScreen(),
         );
       },
     );
@@ -83,16 +84,6 @@ class _MainScreenState extends State<MainScreen> {
     SearchPage(),
     StatsPage(),
   ];
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final collection = context.read<MangaCollectionData>();
-      final serverService = context.read<ExtensionServerService>();
-      serverService.startServer(collection);
-    });
-  }
 
   void _onItemTapped(int index) {
     setState(() {
