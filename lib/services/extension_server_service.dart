@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/manga.dart';
+import 'anilist_service.dart';
 import 'mangadex_service.dart';
 import 'notification_service.dart';
 
@@ -305,7 +306,7 @@ class ExtensionServerService extends ChangeNotifier {
       }
     }
 
-    // 2. Background MangaDex Search
+    // 2. Search MangaDex & AniList in background
     if (matchedManga == null) {
       try {
         final results = await MangaDexService.searchManga(formattedTitle);
@@ -332,6 +333,30 @@ class ExtensionServerService extends ChangeNotifier {
               matchedManga = m;
               m.updateMangaDexId(bestMatch.id);
               m.updateAltTitles(bestMatch.altTitles);
+              break;
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    if (matchedManga == null) {
+      try {
+        final aniResults = await AniListService.searchManga(formattedTitle);
+        if (aniResults.isNotEmpty) {
+          final bestAni = aniResults.first;
+          final String normAni = normalizeTitle(bestAni.title);
+
+          for (final Manga m in collection.mangas) {
+            if (m.anilistId == bestAni.id) {
+              matchedManga = m;
+              break;
+            }
+            final String normLocal = normalizeTitle(m.title);
+            if (normLocal == normAni || normLocal.contains(normAni) || normAni.contains(normLocal)) {
+              matchedManga = m;
+              m.updateAniListId(bestAni.id);
+              m.updateAltTitles([...m.altTitles, ...bestAni.altTitles]);
               break;
             }
           }
@@ -421,6 +446,16 @@ class ExtensionServerService extends ChangeNotifier {
         }
         pending.coverUrl = bestMatch.coverUrl;
         notifyListeners();
+      } else {
+        final aniResults = await AniListService.searchManga(pending.formattedTitle);
+        if (aniResults.isNotEmpty) {
+          final bestAni = aniResults.first;
+          if (bestAni.title.isNotEmpty) {
+            pending.formattedTitle = bestAni.title;
+          }
+          pending.coverUrl = bestAni.coverUrl;
+          notifyListeners();
+        }
       }
     } catch (_) {}
   }
@@ -442,13 +477,13 @@ class ExtensionServerService extends ChangeNotifier {
       targetManga.addSourceUrl(pending.url);
     }
 
-    if (!targetManga.isLinked) {
+    if (!targetManga.isMangaDexLinked) {
       try {
         final results = await MangaDexService.searchManga(targetManga.title);
         if (results.isNotEmpty) {
           final bestMatch = results.first;
           targetManga.updateMangaDexId(bestMatch.id);
-          targetManga.updateAltTitles(bestMatch.altTitles);
+          targetManga.updateAltTitles([...targetManga.altTitles, ...bestMatch.altTitles]);
         }
       } catch (_) {}
     }
@@ -469,6 +504,7 @@ class ExtensionServerService extends ChangeNotifier {
     String synopsis = "";
     List<String> tags = <String>["Manga"];
     String? mangadexId;
+    int? anilistId;
     List<String> altTitlesList = <String>[];
 
     try {
@@ -479,8 +515,19 @@ class ExtensionServerService extends ChangeNotifier {
         coverUrl = await MangaDexService.downloadCoverImageLocally(bestMatch.coverUrl);
         synopsis = bestMatch.synopsis;
         tags = List<String>.from(bestMatch.tags);
-        if (!tags.contains("Linked")) tags.add("Linked");
+        if (!tags.contains("MangaDex")) tags.add("MangaDex");
         altTitlesList = List<String>.from(bestMatch.altTitles);
+      } else {
+        final aniResults = await AniListService.searchManga(pending.formattedTitle);
+        if (aniResults.isNotEmpty) {
+          final bestAni = aniResults.first;
+          anilistId = bestAni.id;
+          coverUrl = await AniListService.downloadCoverImageLocally(bestAni.coverUrl);
+          synopsis = bestAni.synopsis;
+          tags = List<String>.from(bestAni.tags);
+          if (!tags.contains("AniList")) tags.add("AniList");
+          altTitlesList = List<String>.from(bestAni.altTitles);
+        }
       }
     } catch (_) {}
 
@@ -493,6 +540,7 @@ class ExtensionServerService extends ChangeNotifier {
       rating: 0,
       status: pending.defaultStatus,
       mangadexId: mangadexId,
+      anilistId: anilistId,
       altTitles: altTitlesList,
       sourceUrls: pending.url != null ? <String>[pending.url!] : <String>[],
     );

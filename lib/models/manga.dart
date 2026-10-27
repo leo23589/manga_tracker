@@ -82,15 +82,16 @@ class Manga extends ChangeNotifier {
 
   bool get isMangaDexLinked => mangadexId != null && mangadexId!.isNotEmpty;
   bool get isAniListLinked => anilistId != null;
-  bool get isLinked => isMangaDexLinked || isAniListLinked || themes.contains("MangaDex") || themes.contains("AniList") || themes.contains("Linked");
+  bool get isLinked => isMangaDexLinked || isAniListLinked;
 
   String get displayTitle => title.trim();
 
   static List<String> _sortTags(List<String> tagsInput, String? mId, int? aId) {
     List<String> sorted = List<String>.from(tagsInput);
 
-    // Remove "Long Strip" tag (equivalent of Manhwa)
+    // Remove "Long Strip" and old generic "Linked" tag
     sorted.removeWhere((t) => t.toLowerCase() == 'long strip');
+    sorted.remove("Linked");
 
     // MangaDex tag
     if (mId != null && mId.isNotEmpty) {
@@ -118,7 +119,7 @@ class Manga extends ChangeNotifier {
 
     sorted.sort((String a, String b) {
       int getPriority(String tag) {
-        if (tag == "MangaDex" || tag == "AniList" || tag == "Linked") return -1;
+        if (tag == "MangaDex" || tag == "AniList") return -1;
         if (AppConstants.content.contains(tag)) return 0;
         if (AppConstants.themes.contains(tag)) return 1;
         if (AppConstants.genres.contains(tag)) return 2;

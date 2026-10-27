@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../models/manga.dart';
 import '../services/anilist_service.dart';
 import '../services/mangadex_service.dart';
+import '../widgets/dialogs/anilist_autofill_dialog.dart';
 import '../widgets/dialogs/mangadex_autofill_dialog.dart';
 import '../widgets/dialogs/mangadex_cover_picker_dialog.dart';
 import '../widgets/manga_widgets.dart';
@@ -141,27 +142,31 @@ class _MangaDetailPageState extends State<MangaDetailPage> {
     );
   }
 
-  void _linkWithAniList(Manga manga) async {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Searching AniList...')),
+  void _linkWithAniList(Manga manga) {
+    showAniListAutofillDialog(
+      parentContext: context,
+      initialQuery: manga.title,
+      onSelect: (result) async {
+        final localPath = await AniListService.downloadCoverImageLocally(result.coverUrl);
+        manga.updateTitle(result.title);
+        manga.updateSynopsis(result.synopsis);
+        final List<String> updatedTags = List<String>.from(result.tags);
+        if (!updatedTags.contains("AniList")) {
+          updatedTags.add("AniList");
+        }
+        manga.updateThemes(updatedTags);
+        manga.updateAniListId(result.id);
+        manga.updateAltTitles(result.altTitles);
+        if (localPath != null) {
+          manga.updateImage(localPath);
+        }
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Linked "${result.title}" with AniList!'), backgroundColor: const Color(0xFF0284C7)),
+          );
+        }
+      },
     );
-    final results = await AniListService.searchManga(manga.title);
-    if (results.isNotEmpty) {
-      final best = results.first;
-      manga.updateAniListId(best.id);
-      manga.updateAltTitles([...manga.altTitles, ...best.altTitles]);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Linked "${manga.title}" with AniList!'), backgroundColor: const Color(0xFF0284C7)),
-        );
-      }
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No matching title found on AniList.')),
-        );
-      }
-    }
   }
 
   void _showDeleteConfirmationDialog(Manga manga) {

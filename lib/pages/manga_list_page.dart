@@ -54,8 +54,8 @@ class _MangaListPageState extends State<MangaListPage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        children: const [
+                      const Row(
+                        children: [
                           Icon(Icons.notifications_active, color: Colors.amberAccent),
                           SizedBox(width: 8),
                           Text("Activity Logs 🔔", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
