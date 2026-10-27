@@ -12,10 +12,13 @@ class MangaListPage extends StatefulWidget {
   State<MangaListPage> createState() => _MangaListPageState();
 }
 
-class _MangaListPageState extends State<MangaListPage> {
+class _MangaListPageState extends State<MangaListPage> with AutomaticKeepAliveClientMixin {
   final TextEditingController _searchController = TextEditingController();
   MangaStatus? _statusFilter;
-  bool? _linkedFilter; // null = all, true = linked, false = not linked
+  bool? _linkedFilter;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void dispose() {
@@ -130,6 +133,8 @@ class _MangaListPageState extends State<MangaListPage> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
+
     final MangaCollectionData mangaCollection = context.watch<MangaCollectionData>();
     final ExtensionServerService serverService = context.watch<ExtensionServerService>();
 

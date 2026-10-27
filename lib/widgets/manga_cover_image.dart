@@ -19,26 +19,27 @@ class MangaCoverImage extends StatelessWidget {
   Widget build(BuildContext context) {
     Widget imageWidget;
 
+    // Retain retina quality (2x density cache width)
+    final int memWidth = (width > 0 && width < 1000) ? (width * 2).toInt() : 300;
+    final int memHeight = (height > 0 && height < 1000) ? (height * 2).toInt() : 450;
+
     if (imagePath != null && imagePath!.isNotEmpty) {
       if (imagePath!.startsWith('http://') || imagePath!.startsWith('https://')) {
         imageWidget = Image.network(
           imagePath!,
           width: width,
           height: height,
+          cacheWidth: memWidth,
+          cacheHeight: memHeight,
           fit: BoxFit.cover,
           loadingBuilder: (BuildContext context, Widget child, ImageChunkEvent? loadingProgress) {
             if (loadingProgress == null) return child;
             return Container(
               width: width,
               height: height,
-              color: Colors.grey.shade800,
-              child: Center(
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  value: loadingProgress.expectedTotalBytes != null
-                      ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
-                      : null,
-                ),
+              color: const Color(0xFF1E1E28),
+              child: const Center(
+                child: CircularProgressIndicator(strokeWidth: 2),
               ),
             );
           },
@@ -51,6 +52,8 @@ class MangaCoverImage extends StatelessWidget {
           File(imagePath!),
           width: width,
           height: height,
+          cacheWidth: memWidth,
+          cacheHeight: memHeight,
           fit: BoxFit.cover,
           errorBuilder: (BuildContext context, Object error, StackTrace? stackTrace) {
             return _buildPlaceholder();
@@ -73,11 +76,11 @@ class MangaCoverImage extends StatelessWidget {
     return Container(
       width: width,
       height: height,
-      color: Colors.grey.shade800,
+      color: const Color(0xFF1E1E28),
       child: Icon(
         Icons.image_not_supported,
         size: width * 0.4,
-        color: Colors.grey.shade500,
+        color: Colors.grey.shade600,
       ),
     );
   }

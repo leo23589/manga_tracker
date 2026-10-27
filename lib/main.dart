@@ -210,7 +210,10 @@ class _MainScreenState extends State<MainScreen> {
       body: SafeArea(
         child: Stack(
           children: [
-            _pages[_selectedIndex],
+            IndexedStack(
+              index: _selectedIndex,
+              children: _pages,
+            ),
             if (pendingQueue.isNotEmpty)
               Positioned(
                 left: 12,
