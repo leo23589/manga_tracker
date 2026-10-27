@@ -53,6 +53,7 @@ class Manga extends ChangeNotifier {
   int rating;
   MangaStatus status;
   String? mangadexId;
+  int? anilistId;
   List<String> altTitles;
   List<String> sourceUrls;
   
@@ -68,31 +69,41 @@ class Manga extends ChangeNotifier {
     this.rating = 0,
     this.status = MangaStatus.reading,
     this.mangadexId,
+    this.anilistId,
     List<String>? altTitles,
     List<String>? sourceUrls,
     DateTime? createdAt,
     DateTime? lastUpdated,
-  })  : themes = _sortTags(themes, mangadexId),
+  })  : themes = _sortTags(themes, mangadexId, anilistId),
         altTitles = altTitles ?? <String>[],
         sourceUrls = sourceUrls ?? <String>[],
         createdAt = createdAt ?? DateTime.now(),
         lastUpdated = lastUpdated ?? createdAt ?? DateTime.now();
 
-  bool get isLinked => mangadexId != null && mangadexId!.isNotEmpty;
+  bool get isMangaDexLinked => mangadexId != null && mangadexId!.isNotEmpty;
+  bool get isAniListLinked => anilistId != null;
+  bool get isLinked => isMangaDexLinked || isAniListLinked || themes.contains("MangaDex") || themes.contains("AniList") || themes.contains("Linked");
 
   String get displayTitle => title.trim();
 
-  static List<String> _sortTags(List<String> tagsInput, String? mId) {
+  static List<String> _sortTags(List<String> tagsInput, String? mId, int? aId) {
     List<String> sorted = List<String>.from(tagsInput);
 
     // Remove "Long Strip" tag (equivalent of Manhwa)
     sorted.removeWhere((t) => t.toLowerCase() == 'long strip');
 
-    // "Linked" tag is ONLY present if equivalent MangaDex ID is set
-    if (mId == null || mId.isEmpty) {
-      sorted.remove("Linked");
-    } else if (!sorted.contains("Linked")) {
-      sorted.add("Linked");
+    // MangaDex tag
+    if (mId != null && mId.isNotEmpty) {
+      if (!sorted.contains("MangaDex")) sorted.add("MangaDex");
+    } else {
+      sorted.remove("MangaDex");
+    }
+
+    // AniList tag
+    if (aId != null) {
+      if (!sorted.contains("AniList")) sorted.add("AniList");
+    } else {
+      sorted.remove("AniList");
     }
 
     // Enforce mutual exclusivity: a title can only have Manga OR Manhwa OR Manhua
@@ -107,7 +118,7 @@ class Manga extends ChangeNotifier {
 
     sorted.sort((String a, String b) {
       int getPriority(String tag) {
-        if (tag == "Linked") return -1; // Highest priority for Linked tag
+        if (tag == "MangaDex" || tag == "AniList" || tag == "Linked") return -1;
         if (AppConstants.content.contains(tag)) return 0;
         if (AppConstants.themes.contains(tag)) return 1;
         if (AppConstants.genres.contains(tag)) return 2;
@@ -131,6 +142,7 @@ class Manga extends ChangeNotifier {
       'rating': rating,
       'status': status.label,
       'mangadexId': mangadexId,
+      'anilistId': anilistId,
       'altTitles': altTitles,
       'sourceUrls': sourceUrls,
       'createdAt': createdAt.toIso8601String(),
@@ -148,6 +160,7 @@ class Manga extends ChangeNotifier {
       rating: map['rating'] ?? 0,
       status: MangaStatusExtension.fromString(map['status']),
       mangadexId: map['mangadexId'],
+      anilistId: map['anilistId'],
       altTitles: List<String>.from(map['altTitles'] ?? <String>[]),
       sourceUrls: List<String>.from(map['sourceUrls'] ?? <String>[]),
       createdAt: DateTime.parse(map['createdAt']),
@@ -184,7 +197,13 @@ class Manga extends ChangeNotifier {
 
   void updateMangaDexId(String? id) {
     mangadexId = id;
-    themes = _sortTags(themes, mangadexId);
+    themes = _sortTags(themes, mangadexId, anilistId);
+    _touch();
+  }
+
+  void updateAniListId(int? id) {
+    anilistId = id;
+    themes = _sortTags(themes, mangadexId, anilistId);
     _touch();
   }
 
@@ -218,7 +237,7 @@ class Manga extends ChangeNotifier {
   }
 
   void updateThemes(List<String> newThemes) {
-    themes = _sortTags(newThemes, mangadexId);
+    themes = _sortTags(newThemes, mangadexId, anilistId);
     _touch();
   }
 

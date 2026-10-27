@@ -107,10 +107,14 @@ class DisplayTagList extends StatelessWidget {
         Color? effectiveTextColor = textColor ?? Colors.white70;
         Widget? avatar;
 
-        if (tag == "Linked") {
+        if (tag == "MangaDex" || tag == "Linked") {
           effectiveBackgroundColor = const Color(0xFF4F46E5);
           effectiveTextColor = Colors.white;
           avatar = const Icon(Icons.link, size: 14, color: Colors.amberAccent);
+        } else if (tag == "AniList") {
+          effectiveBackgroundColor = const Color(0xFF0284C7);
+          effectiveTextColor = Colors.white;
+          avatar = const Icon(Icons.auto_awesome, size: 14, color: Colors.cyanAccent);
         } else if (AppConstants.content.contains(tag)) {
           effectiveBackgroundColor = contentTagColor ?? Colors.red.shade900;
         } else if (AppConstants.themes.contains(tag)) {
@@ -119,16 +123,26 @@ class DisplayTagList extends StatelessWidget {
           effectiveBackgroundColor = genreTagColor ?? Colors.blue.shade900;
         }
 
+        final bool isSpecialTag = tag == "MangaDex" || tag == "AniList" || tag == "Linked";
+
         return Chip(
           avatar: avatar,
           label: Text(tag),
           backgroundColor: effectiveBackgroundColor,
-          labelStyle: TextStyle(color: effectiveTextColor, fontSize: 12, fontWeight: tag == "Linked" ? FontWeight.bold : FontWeight.normal),
+          labelStyle: TextStyle(
+            color: effectiveTextColor,
+            fontSize: 12,
+            fontWeight: isSpecialTag ? FontWeight.bold : FontWeight.normal,
+          ),
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
           visualDensity: VisualDensity.compact,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
-            side: BorderSide(color: tag == "Linked" ? const Color(0xFF818CF8) : Colors.grey.shade700),
+            side: BorderSide(
+              color: tag == "MangaDex" || tag == "Linked"
+                  ? const Color(0xFF818CF8)
+                  : (tag == "AniList" ? const Color(0xFF38BDF8) : Colors.grey.shade700),
+            ),
           ),
         );
       }).toList(),

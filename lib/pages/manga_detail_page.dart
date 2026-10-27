@@ -5,6 +5,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import 'package:provider/provider.dart';
 import '../models/manga.dart';
+import '../services/anilist_service.dart';
 import '../services/mangadex_service.dart';
 import '../widgets/dialogs/mangadex_autofill_dialog.dart';
 import '../widgets/dialogs/mangadex_cover_picker_dialog.dart';
@@ -122,8 +123,8 @@ class _MangaDetailPageState extends State<MangaDetailPage> {
         manga.updateTitle(result.title);
         manga.updateSynopsis(result.synopsis);
         final List<String> updatedTags = List<String>.from(result.tags);
-        if (!updatedTags.contains("Linked")) {
-          updatedTags.add("Linked");
+        if (!updatedTags.contains("MangaDex")) {
+          updatedTags.add("MangaDex");
         }
         manga.updateThemes(updatedTags);
         manga.updateMangaDexId(result.id);
@@ -138,6 +139,29 @@ class _MangaDetailPageState extends State<MangaDetailPage> {
         }
       },
     );
+  }
+
+  void _linkWithAniList(Manga manga) async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Searching AniList...')),
+    );
+    final results = await AniListService.searchManga(manga.title);
+    if (results.isNotEmpty) {
+      final best = results.first;
+      manga.updateAniListId(best.id);
+      manga.updateAltTitles([...manga.altTitles, ...best.altTitles]);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Linked "${manga.title}" with AniList!'), backgroundColor: const Color(0xFF0284C7)),
+        );
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No matching title found on AniList.')),
+        );
+      }
+    }
   }
 
   void _showDeleteConfirmationDialog(Manga manga) {
@@ -218,6 +242,8 @@ class _MangaDetailPageState extends State<MangaDetailPage> {
                   _enterEditMode();
                 } else if (result == 'link_mangadex') {
                   _linkWithMangaDex(widget.manga);
+                } else if (result == 'link_anilist') {
+                  _linkWithAniList(widget.manga);
                 } else if (result == 'delete') {
                   _showDeleteConfirmationDialog(widget.manga);
                 }
@@ -230,6 +256,10 @@ class _MangaDetailPageState extends State<MangaDetailPage> {
                 const PopupMenuItem<String>(
                   value: 'link_mangadex',
                   child: Row(children: <Widget>[Icon(Icons.auto_awesome, color: Colors.indigoAccent, size: 20), SizedBox(width: 8), Text('Link with MangaDex')]),
+                ),
+                const PopupMenuItem<String>(
+                  value: 'link_anilist',
+                  child: Row(children: <Widget>[Icon(Icons.auto_awesome, color: Colors.cyanAccent, size: 20), SizedBox(width: 8), Text('Link with AniList')]),
                 ),
                 const PopupMenuItem<String>(
                   value: 'delete',

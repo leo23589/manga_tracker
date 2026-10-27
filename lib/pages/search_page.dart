@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/manga.dart';
+import '../services/anilist_service.dart';
 import '../services/mangadex_service.dart';
 import '../widgets/manga_widgets.dart';
+import '../widgets/search/anilist_result_tile.dart';
 import '../widgets/search/mangadex_result_tile.dart';
 
-enum SearchMode { local, mangadex }
+enum SearchMode { local, mangadex, anilist }
 
 class SearchPage extends StatefulWidget {
   const SearchPage({super.key});
@@ -31,10 +33,17 @@ class _SearchPageState extends State<SearchPage> {
   bool _hasSearchedMangaDex = false;
   bool _isOfflineError = false;
 
+  // AniList Search State
+  final TextEditingController _anilistSearchController = TextEditingController();
+  List<AniListSearchResult> _anilistResults = <AniListSearchResult>[];
+  bool _isLoadingAniList = false;
+  bool _hasSearchedAniList = false;
+
   @override
   void dispose() {
     _localSearchController.dispose();
     _mangadexSearchController.dispose();
+    _anilistSearchController.dispose();
     super.dispose();
   }
 
@@ -71,6 +80,35 @@ class _SearchPageState extends State<SearchPage> {
     }
   }
 
+  Future<void> _performAniListSearch() async {
+    final String query = _anilistSearchController.text.trim();
+    if (query.isEmpty) return;
+
+    FocusScope.of(context).unfocus();
+
+    setState(() {
+      _isLoadingAniList = true;
+      _hasSearchedAniList = true;
+    });
+
+    try {
+      final results = await AniListService.searchManga(query);
+      if (mounted) {
+        setState(() {
+          _anilistResults = results;
+          _isLoadingAniList = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _anilistResults = <AniListSearchResult>[];
+          _isLoadingAniList = false;
+        });
+      }
+    }
+  }
+
   Widget _buildOfflineErrorWidget() {
     return Center(
       child: Padding(
@@ -98,7 +136,7 @@ class _SearchPageState extends State<SearchPage> {
             ),
             const SizedBox(height: 8),
             const Text(
-              "Unable to reach MangaDex. Please check your internet connection.",
+              "Unable to reach network. Please check your internet connection.",
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.white70),
             ),
@@ -138,18 +176,23 @@ class _SearchPageState extends State<SearchPage> {
           children: <Widget>[
             const SizedBox(height: 12),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
               child: SegmentedButton<SearchMode>(
                 segments: const <ButtonSegment<SearchMode>>[
                   ButtonSegment<SearchMode>(
                     value: SearchMode.local,
-                    label: Text("My Library"),
-                    icon: Icon(Icons.library_books),
+                    label: Text("Library"),
+                    icon: Icon(Icons.library_books, size: 16),
                   ),
                   ButtonSegment<SearchMode>(
                     value: SearchMode.mangadex,
-                    label: Text("MangaDex Online"),
-                    icon: Icon(Icons.public),
+                    label: Text("MangaDex"),
+                    icon: Icon(Icons.public, size: 16),
+                  ),
+                  ButtonSegment<SearchMode>(
+                    value: SearchMode.anilist,
+                    label: Text("AniList"),
+                    icon: Icon(Icons.auto_awesome, size: 16),
                   ),
                 ],
                 selected: <SearchMode>{_searchMode},
@@ -263,7 +306,7 @@ class _SearchPageState extends State<SearchPage> {
                   ),
                 ),
               ),
-            ] else ...[
+            ] else if (_searchMode == SearchMode.mangadex) ...[
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: TextField(
@@ -322,6 +365,64 @@ class _SearchPageState extends State<SearchPage> {
                                       );
                                     },
                                   ),
+              ),
+            ] else ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: TextField(
+                  controller: _anilistSearchController,
+                  textInputAction: TextInputAction.search,
+                  onSubmitted: (_) => _performAniListSearch(),
+                  decoration: InputDecoration(
+                    hintText: "Search AniList online...",
+                    prefixIcon: const Icon(Icons.auto_awesome, color: Colors.cyanAccent),
+                    suffixIcon: IconButton(
+                      icon: const Icon(Icons.search),
+                      onPressed: _performAniListSearch,
+                    ),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    filled: true,
+                    fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withAlpha((255 * 0.3).round()),
+                  ),
+                ),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: _isLoadingAniList
+                    ? const Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            CircularProgressIndicator(),
+                            SizedBox(height: 12),
+                            Text("Searching AniList..."),
+                          ],
+                        ),
+                      )
+                    : !_hasSearchedAniList
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.auto_awesome, size: 64, color: Colors.cyan.shade600),
+                                const SizedBox(height: 12),
+                                const Text("Search titles on AniList to import them!"),
+                              ],
+                            ),
+                          )
+                        : _anilistResults.isEmpty
+                            ? const Center(child: Text("No results found on AniList."))
+                            : ListView.builder(
+                                padding: const EdgeInsets.all(10),
+                                itemCount: _anilistResults.length,
+                                itemBuilder: (BuildContext context, int index) {
+                                  return AniListResultTile(
+                                    result: _anilistResults[index],
+                                    collection: mangaCollection,
+                                    onStateUpdated: () => setState(() {}),
+                                  );
+                                },
+                              ),
               ),
             ],
           ],
