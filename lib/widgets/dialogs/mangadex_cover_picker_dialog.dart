@@ -5,6 +5,7 @@ import '../manga_cover_image.dart';
 void showMangaDexCoverPickerDialog({
   required BuildContext parentContext,
   required String mangaTitle,
+  String? mangaDexId,
   required Function(String localCoverPath) onSelectCover,
 }) {
   List<String> coverUrls = <String>[];
@@ -27,7 +28,7 @@ void showMangaDexCoverPickerDialog({
             });
 
             try {
-              final urls = await MangaDexService.getMangaCoverUrls(mangaTitle);
+              final urls = await MangaDexService.getMangaCoverUrls(mangaId: mangaDexId, query: mangaTitle);
               if (context.mounted) {
                 setState(() {
                   coverUrls = urls;
@@ -92,7 +93,7 @@ void showMangaDexCoverPickerDialog({
                                   ),
                                 )
                               : coverUrls.isEmpty
-                                  ? const Center(child: Text("No covers found for this manga."))
+                                  ? const Center(child: Text("No covers found."))
                                   : GridView.builder(
                                       controller: scrollController,
                                       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(

@@ -25,8 +25,8 @@ class MangaDexSearchResult {
 
   Manga toManga() {
     final List<String> updatedTags = List<String>.from(tags);
-    if (!updatedTags.contains("Linked")) {
-      updatedTags.add("Linked");
+    if (!updatedTags.contains("MangaDex")) {
+      updatedTags.add("MangaDex");
     }
     return Manga(
       title: title,
@@ -43,8 +43,8 @@ class MangaDexSearchResult {
   Future<Manga> toMangaWithLocalCover() async {
     final String? localPath = await MangaDexService.downloadCoverImageLocally(coverUrl);
     final List<String> updatedTags = List<String>.from(tags);
-    if (!updatedTags.contains("Linked")) {
-      updatedTags.add("Linked");
+    if (!updatedTags.contains("MangaDex")) {
+      updatedTags.add("MangaDex");
     }
     return Manga(
       title: title,
@@ -86,19 +86,21 @@ class MangaDexService {
     return imageUrl; // Fallback to URL if download fails
   }
 
-  /// Searches MangaDex and returns a list of cover art URLs for the matching manga (ONLY covers, no names).
-  static Future<List<String>> getMangaCoverUrls(String query) async {
-    if (query.trim().isEmpty) return <String>[];
+  /// Searches MangaDex and returns a list of cover art URLs for the matching manga directly using [mangaId] or falling back to [query].
+  static Future<List<String>> getMangaCoverUrls({String? mangaId, String? query}) async {
+    String? targetId = mangaId;
 
-    try {
+    if (targetId == null || targetId.trim().isEmpty) {
+      if (query == null || query.trim().isEmpty) return <String>[];
       final results = await searchManga(query);
       if (results.isEmpty) return <String>[];
+      targetId = results.first.id;
+    }
 
-      final String mangaId = results.first.id;
-
+    try {
       final Uri uri = Uri.parse('$_baseUrl/cover').replace(
         queryParameters: <String, String>{
-          'manga[]': mangaId,
+          'manga[]': targetId,
           'limit': '100',
           'order[volume]': 'desc',
         },
@@ -108,12 +110,7 @@ class MangaDexService {
         const Duration(seconds: 10),
       );
 
-      if (response.statusCode != 200) {
-        if (results.first.coverUrl != null) {
-          return [results.first.coverUrl!];
-        }
-        return <String>[];
-      }
+      if (response.statusCode != 200) return <String>[];
 
       final Map<String, dynamic> body = jsonDecode(response.body);
       final List<dynamic> data = body['data'] ?? <dynamic>[];
@@ -123,18 +120,14 @@ class MangaDexService {
         if (item is Map && item['attributes'] is Map) {
           final String? fileName = item['attributes']['fileName'] as String?;
           if (fileName != null && fileName.isNotEmpty) {
-            coverUrls.add('https://uploads.mangadex.org/covers/$mangaId/$fileName.512.jpg');
+            coverUrls.add('https://uploads.mangadex.org/covers/$targetId/$fileName.512.jpg');
           }
         }
       }
 
-      if (coverUrls.isEmpty && results.first.coverUrl != null) {
-        coverUrls.add(results.first.coverUrl!);
-      }
-
       return coverUrls;
     } catch (e) {
-      debugPrint('Error fetching cover art URLs: $e');
+      debugPrint('Error fetching MangaDex cover art URLs: $e');
       return <String>[];
     }
   }

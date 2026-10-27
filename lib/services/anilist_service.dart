@@ -63,6 +63,44 @@ class AniListService {
     return imageUrl;
   }
 
+  /// Fetches cover image URL directly by AniList [mediaId].
+  static Future<String?> getCoverByMediaId(int mediaId) async {
+    const String queryBody = '''
+    query (\$id: Int) {
+      Media(id: \$id, type: MANGA) {
+        id
+        coverImage {
+          extraLarge
+          large
+          medium
+        }
+      }
+    }
+    ''';
+
+    try {
+      final http.Response response = await http.post(
+        Uri.parse(_graphqlUrl),
+        headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+        body: jsonEncode({
+          'query': queryBody,
+          'variables': {'id': mediaId},
+        }),
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> body = jsonDecode(response.body);
+        final Map<String, dynamic>? coverMap = body['data']?['Media']?['coverImage'] as Map<String, dynamic>?;
+        if (coverMap != null) {
+          return coverMap['extraLarge'] as String? ?? coverMap['large'] as String?;
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching AniList cover by ID: $e');
+    }
+    return null;
+  }
+
   static Future<List<AniListSearchResult>> searchManga(String query) async {
     if (query.trim().isEmpty) return <AniListSearchResult>[];
 
@@ -141,7 +179,7 @@ class AniListService {
         }
 
         String rawSynopsis = item['description'] as String? ?? '';
-        rawSynopsis = rawSynopsis.replaceAll(RegExp(r'<[^>]*>'), ''); // Strip HTML tags
+        rawSynopsis = rawSynopsis.replaceAll(RegExp(r'<[^>]*>'), '');
 
         String? coverUrl;
         final Map<String, dynamic>? coverMap = item['coverImage'] as Map<String, dynamic>?;

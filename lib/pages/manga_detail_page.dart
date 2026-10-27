@@ -91,6 +91,7 @@ class _MangaDetailPageState extends State<MangaDetailPage> {
                   showMangaDexCoverPickerDialog(
                     parentContext: context,
                     mangaTitle: manga.title,
+                    mangaDexId: manga.mangadexId,
                     onSelectCover: (localPath) {
                       manga.updateImage(localPath);
                       setState(() => _temporaryImagePath = localPath);
@@ -121,18 +122,14 @@ class _MangaDetailPageState extends State<MangaDetailPage> {
       initialQuery: manga.title,
       onSelect: (result) async {
         final localPath = await MangaDexService.downloadCoverImageLocally(result.coverUrl);
-        manga.updateTitle(result.title);
-        manga.updateSynopsis(result.synopsis);
-        final List<String> updatedTags = List<String>.from(result.tags);
-        if (!updatedTags.contains("MangaDex")) {
-          updatedTags.add("MangaDex");
-        }
-        manga.updateThemes(updatedTags);
-        manga.updateMangaDexId(result.id);
-        manga.updateAltTitles(result.altTitles);
-        if (localPath != null) {
-          manga.updateImage(localPath);
-        }
+        manga.mergeMangaDetails(
+          newTitle: result.title,
+          newSynopsis: result.synopsis,
+          newTags: [...result.tags, "MangaDex"],
+          newAltTitles: result.altTitles,
+          newMangaDexId: result.id,
+          newCoverPath: localPath,
+        );
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Linked "${result.title}" with MangaDex!'), backgroundColor: Colors.green),
@@ -148,18 +145,14 @@ class _MangaDetailPageState extends State<MangaDetailPage> {
       initialQuery: manga.title,
       onSelect: (result) async {
         final localPath = await AniListService.downloadCoverImageLocally(result.coverUrl);
-        manga.updateTitle(result.title);
-        manga.updateSynopsis(result.synopsis);
-        final List<String> updatedTags = List<String>.from(result.tags);
-        if (!updatedTags.contains("AniList")) {
-          updatedTags.add("AniList");
-        }
-        manga.updateThemes(updatedTags);
-        manga.updateAniListId(result.id);
-        manga.updateAltTitles(result.altTitles);
-        if (localPath != null) {
-          manga.updateImage(localPath);
-        }
+        manga.mergeMangaDetails(
+          newTitle: result.title,
+          newSynopsis: result.synopsis,
+          newTags: [...result.tags, "AniList"],
+          newAltTitles: result.altTitles,
+          newAniListId: result.id,
+          newCoverPath: localPath,
+        );
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Linked "${result.title}" with AniList!'), backgroundColor: const Color(0xFF0284C7)),
