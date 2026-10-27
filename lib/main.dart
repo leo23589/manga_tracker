@@ -118,13 +118,16 @@ class _MainScreenState extends State<MainScreen> {
                   m.altTitles.any((alt) => alt.toLowerCase().contains(q));
             }).toList();
 
-            return AlertDialog(
-              title: const Text("Link to Existing Manga"),
-              content: SizedBox(
-                width: double.maxFinite,
+            return Dialog(
+              insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              child: Container(
+                padding: const EdgeInsets.all(16.0),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    const Text("Link to Existing Manga 🔗", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 12),
                     TextField(
                       decoration: const InputDecoration(
                         hintText: "Search your library...",
@@ -135,42 +138,43 @@ class _MainScreenState extends State<MainScreen> {
                       onChanged: (val) => setState(() => searchQuery = val),
                     ),
                     const SizedBox(height: 12),
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxHeight: 300),
-                      child: filtered.isEmpty
-                          ? const Center(child: Padding(padding: EdgeInsets.all(16), child: Text("No manga found.")))
-                          : ListView.builder(
-                              shrinkWrap: true,
-                              itemCount: filtered.length,
-                              itemBuilder: (context, index) {
-                                final manga = filtered[index];
-                                return ListTile(
-                                  leading: MangaCoverImage(
-                                    imagePath: manga.imagePath,
-                                    width: 35,
-                                    height: 50,
-                                    borderRadius: 6,
-                                  ),
-                                  title: Text(manga.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                                  subtitle: Text("Ch. ${manga.currentChapter} • ${manga.status.label}", style: const TextStyle(fontSize: 12)),
-                                  trailing: const Icon(Icons.link, color: Colors.indigoAccent),
-                                  onTap: () {
-                                    Navigator.of(dialogContext).pop();
-                                    serverService.linkCurrentPendingToExisting(manga);
-                                  },
-                                );
-                              },
-                            ),
+                    Flexible(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 350),
+                        child: filtered.isEmpty
+                            ? const Center(child: Padding(padding: EdgeInsets.all(16), child: Text("No manga found.")))
+                            : ListView.builder(
+                                shrinkWrap: true,
+                                itemCount: filtered.length,
+                                itemBuilder: (context, index) {
+                                  final manga = filtered[index];
+                                  return ListTile(
+                                    leading: MangaCoverImage(
+                                      imagePath: manga.imagePath,
+                                      width: 35,
+                                      height: 50,
+                                      borderRadius: 6,
+                                    ),
+                                    title: Text(manga.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                    subtitle: Text("Ch. ${manga.currentChapter} • ${manga.status.label}", style: const TextStyle(fontSize: 12)),
+                                    trailing: const Icon(Icons.link, color: Colors.indigoAccent),
+                                    onTap: () {
+                                      Navigator.of(dialogContext).pop();
+                                      serverService.linkCurrentPendingToExisting(manga);
+                                    },
+                                  );
+                                },
+                              ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextButton(
+                      onPressed: () => Navigator.of(dialogContext).pop(),
+                      child: const Text("Cancel"),
                     ),
                   ],
                 ),
               ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(),
-                  child: const Text("Cancel"),
-                ),
-              ],
             );
           },
         );
@@ -199,196 +203,231 @@ class _MainScreenState extends State<MainScreen> {
       });
     }
 
-    final pending = serverService.currentPending;
-    final queueCount = serverService.pendingQueue.length;
+    final pendingQueue = serverService.pendingQueue;
 
     return Scaffold(
-      body: Stack(
-        children: [
-          _pages[_selectedIndex],
-          if (pending != null)
-            Positioned(
-              left: 16,
-              right: 16,
-              bottom: 16,
-              child: Material(
-                elevation: 16,
-                borderRadius: BorderRadius.circular(16),
-                color: const Color(0xFF181824),
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: const Color(0xFF6366F1).withAlpha((255 * 0.6).round()),
-                      width: 1.5,
+      resizeToAvoidBottomInset: true,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            _pages[_selectedIndex],
+            if (pendingQueue.isNotEmpty)
+              Positioned(
+                left: 12,
+                right: 12,
+                bottom: 12,
+                top: MediaQuery.of(context).size.height * 0.22,
+                child: Material(
+                  elevation: 24,
+                  borderRadius: BorderRadius.circular(24),
+                  color: const Color(0xFF161622),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: const Color(0xFF6366F1),
+                        width: 2.0,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withAlpha((255 * 0.7).round()),
+                          blurRadius: 24,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withAlpha((255 * 0.5).round()),
-                        blurRadius: 16,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  padding: const EdgeInsets.all(14.0),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.extension, color: Colors.amber, size: 20),
-                              const SizedBox(width: 8),
-                              Text(
-                                pending.isChapter ? "New Manga Detected" : "Add to Plan to Read",
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                  color: Colors.amber,
-                                ),
-                              ),
-                            ],
-                          ),
-                          if (queueCount > 1)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: Colors.indigo.shade900,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                "1 of $queueCount in queue",
-                                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white70),
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          MangaCoverImage(
-                            imagePath: pending.coverUrl,
-                            width: 50,
-                            height: 75,
-                            borderRadius: 8,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Header Row
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
                               children: [
+                                const Icon(Icons.extension, color: Colors.amber, size: 24),
+                                const SizedBox(width: 8),
                                 Text(
-                                  pending.formattedTitle,
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
+                                  "New Additions Detected (${pendingQueue.length})",
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                    color: Colors.amber,
+                                  ),
                                 ),
-                                const SizedBox(height: 6),
-                                Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: pending.defaultStatus == MangaStatus.reading
-                                            ? const Color(0xFF0284C7).withAlpha((255 * 0.3).round())
-                                            : const Color(0xFF7C3AED).withAlpha((255 * 0.3).round()),
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: Text(
-                                        pending.defaultStatus.label,
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
-                                          color: pending.defaultStatus == MangaStatus.reading
-                                              ? const Color(0xFF38BDF8)
-                                              : const Color(0xFFA78BFA),
-                                        ),
-                                      ),
-                                    ),
-                                    if (pending.isChapter) ...[
-                                      const SizedBox(width: 10),
+                              ],
+                            ),
+                            Row(
+                              children: [
+                                TextButton(
+                                  onPressed: () {
+                                    while (serverService.pendingQueue.isNotEmpty) {
+                                      serverService.dismissCurrentPending();
+                                    }
+                                  },
+                                  child: const Text("Skip All", style: TextStyle(color: Colors.white54, fontSize: 12)),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.close, color: Colors.white70),
+                                  onPressed: () {
+                                    serverService.dismissCurrentPending();
+                                  },
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        const Divider(height: 1),
+                        const SizedBox(height: 12),
+
+                        // Stacked List of Pending Adds
+                        Expanded(
+                          child: ListView.builder(
+                            itemCount: pendingQueue.length,
+                            itemBuilder: (context, index) {
+                              final pending = pendingQueue[index];
+                              return Card(
+                                margin: const EdgeInsets.only(bottom: 12),
+                                color: const Color(0xFF1E1E2C),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(12.0),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
                                       Row(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          InkWell(
-                                            onTap: () {
-                                              if (pending.chapter > 1) {
-                                                serverService.updateCurrentPendingChapter(pending.chapter - 1);
-                                              }
-                                            },
-                                            child: const Icon(Icons.remove_circle_outline, size: 18, color: Colors.white70),
+                                          MangaCoverImage(
+                                            imagePath: pending.coverUrl,
+                                            width: 55,
+                                            height: 80,
+                                            borderRadius: 8,
                                           ),
-                                          Padding(
-                                            padding: const EdgeInsets.symmetric(horizontal: 6.0),
-                                            child: Text(
-                                              "Ch. ${pending.chapter}",
-                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  pending.formattedTitle,
+                                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white),
+                                                  maxLines: 2,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                                const SizedBox(height: 6),
+                                                Row(
+                                                  children: [
+                                                    Container(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                      decoration: BoxDecoration(
+                                                        color: pending.defaultStatus == MangaStatus.reading
+                                                            ? const Color(0xFF0284C7).withAlpha((255 * 0.35).round())
+                                                            : const Color(0xFF7C3AED).withAlpha((255 * 0.35).round()),
+                                                        borderRadius: BorderRadius.circular(6),
+                                                      ),
+                                                      child: Text(
+                                                        pending.defaultStatus.label,
+                                                        style: TextStyle(
+                                                          fontSize: 11,
+                                                          fontWeight: FontWeight.bold,
+                                                          color: pending.defaultStatus == MangaStatus.reading
+                                                              ? const Color(0xFF38BDF8)
+                                                              : const Color(0xFFA78BFA),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    if (pending.isChapter) ...[
+                                                      const SizedBox(width: 10),
+                                                      Row(
+                                                        children: [
+                                                          InkWell(
+                                                            onTap: () {
+                                                              if (pending.chapter > 1) {
+                                                                serverService.updateCurrentPendingChapter(pending.chapter - 1);
+                                                              }
+                                                            },
+                                                            child: const Icon(Icons.remove_circle_outline, size: 20, color: Colors.white70),
+                                                          ),
+                                                          Padding(
+                                                            padding: const EdgeInsets.symmetric(horizontal: 6.0),
+                                                            child: Text(
+                                                              "Ch. ${pending.chapter}",
+                                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                                            ),
+                                                          ),
+                                                          InkWell(
+                                                            onTap: () {
+                                                              serverService.updateCurrentPendingChapter(pending.chapter + 1);
+                                                            },
+                                                            child: const Icon(Icons.add_circle_outline, size: 20, color: Colors.white70),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ],
+                                                  ],
+                                                ),
+                                              ],
                                             ),
                                           ),
-                                          InkWell(
-                                            onTap: () {
-                                              serverService.updateCurrentPendingChapter(pending.chapter + 1);
+                                        ],
+                                      ),
+                                      const SizedBox(height: 10),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          TextButton.icon(
+                                            style: TextButton.styleFrom(
+                                              foregroundColor: const Color(0xFF818CF8),
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                            ),
+                                            icon: const Icon(Icons.link, size: 16),
+                                            label: const Text("Link to Existing", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                            onPressed: () {
+                                              _showLinkToExistingDialog(context, collection, serverService, pending);
                                             },
-                                            child: const Icon(Icons.add_circle_outline, size: 18, color: Colors.white70),
+                                          ),
+                                          Row(
+                                            children: [
+                                              TextButton(
+                                                onPressed: () {
+                                                  serverService.dismissCurrentPending();
+                                                },
+                                                child: const Text("Skip", style: TextStyle(color: Colors.white54, fontSize: 12)),
+                                              ),
+                                              const SizedBox(width: 4),
+                                              ElevatedButton.icon(
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: const Color(0xFF6366F1),
+                                                  foregroundColor: Colors.white,
+                                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                                ),
+                                                onPressed: () {
+                                                  serverService.addCurrentPendingManga(collection);
+                                                },
+                                                icon: const Icon(Icons.add, size: 16),
+                                                label: const Text("Add New", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                              ),
+                                            ],
                                           ),
                                         ],
                                       ),
                                     ],
-                                  ],
+                                  ),
                                 ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          TextButton.icon(
-                            style: TextButton.styleFrom(
-                              foregroundColor: const Color(0xFF818CF8),
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            ),
-                            icon: const Icon(Icons.link, size: 16),
-                            label: const Text("Link to Existing", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                            onPressed: () {
-                              _showLinkToExistingDialog(context, collection, serverService, pending);
+                              );
                             },
                           ),
-                          Row(
-                            children: [
-                              TextButton(
-                                onPressed: () {
-                                  serverService.dismissCurrentPending();
-                                },
-                                child: const Text("Skip", style: TextStyle(color: Colors.white54, fontSize: 12)),
-                              ),
-                              const SizedBox(width: 4),
-                              ElevatedButton.icon(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF6366F1),
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                ),
-                                onPressed: () {
-                                  serverService.addCurrentPendingManga(collection);
-                                },
-                                icon: const Icon(Icons.add, size: 16),
-                                label: const Text("Add New", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,

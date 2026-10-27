@@ -75,7 +75,7 @@ class Manga extends ChangeNotifier {
     DateTime? createdAt,
     DateTime? lastUpdated,
   })  : themes = _sortTags(themes, mangadexId, anilistId),
-        altTitles = altTitles ?? <String>[],
+        altTitles = _deduplicateStrings(altTitles ?? <String>[], title),
         sourceUrls = sourceUrls ?? <String>[],
         createdAt = createdAt ?? DateTime.now(),
         lastUpdated = lastUpdated ?? createdAt ?? DateTime.now();
@@ -86,28 +86,37 @@ class Manga extends ChangeNotifier {
 
   String get displayTitle => title.trim();
 
+  static List<String> _deduplicateStrings(List<String> list, String primary) {
+    final Set<String> unique = <String>{};
+    for (final String item in list) {
+      final String clean = item.trim();
+      if (clean.isNotEmpty && clean.toLowerCase() != primary.trim().toLowerCase()) {
+        if (!unique.any((u) => u.toLowerCase() == clean.toLowerCase())) {
+          unique.add(clean);
+        }
+      }
+    }
+    return unique.toList();
+  }
+
   static List<String> _sortTags(List<String> tagsInput, String? mId, int? aId) {
     List<String> sorted = List<String>.from(tagsInput);
 
-    // Remove "Long Strip" and old generic "Linked" tag
     sorted.removeWhere((t) => t.toLowerCase() == 'long strip');
     sorted.remove("Linked");
 
-    // MangaDex tag
     if (mId != null && mId.isNotEmpty) {
       if (!sorted.contains("MangaDex")) sorted.add("MangaDex");
     } else {
       sorted.remove("MangaDex");
     }
 
-    // AniList tag
     if (aId != null) {
       if (!sorted.contains("AniList")) sorted.add("AniList");
     } else {
       sorted.remove("AniList");
     }
 
-    // Enforce mutual exclusivity: a title can only have Manga OR Manhwa OR Manhua
     if (sorted.contains("Manhwa")) {
       sorted.remove("Manga");
       sorted.remove("Manhua");
@@ -117,7 +126,16 @@ class Manga extends ChangeNotifier {
       sorted.insert(0, "Manga");
     }
 
-    sorted.sort((String a, String b) {
+    final Set<String> uniqueTags = <String>{};
+    final List<String> deduped = <String>[];
+    for (final String t in sorted) {
+      if (!uniqueTags.contains(t.toLowerCase())) {
+        uniqueTags.add(t.toLowerCase());
+        deduped.add(t);
+      }
+    }
+
+    deduped.sort((String a, String b) {
       int getPriority(String tag) {
         if (tag == "MangaDex" || tag == "AniList") return -1;
         if (AppConstants.content.contains(tag)) return 0;
@@ -130,7 +148,39 @@ class Manga extends ChangeNotifier {
       if (priorityA != priorityB) return priorityA.compareTo(priorityB);
       return a.compareTo(b);
     });
-    return sorted;
+    return deduped;
+  }
+
+  void mergeMangaDetails({
+    String? newTitle,
+    String? newSynopsis,
+    List<String>? newTags,
+    List<String>? newAltTitles,
+    String? newMangaDexId,
+    int? newAniListId,
+    String? newCoverPath,
+  }) {
+    if (newTitle != null && newTitle.trim().isNotEmpty) {
+      title = newTitle.trim();
+    }
+
+    if (newSynopsis != null && newSynopsis.trim().isNotEmpty) {
+      if (synopsis.isEmpty || newSynopsis.length > synopsis.length) {
+        synopsis = newSynopsis.trim();
+      }
+    }
+
+    if (newMangaDexId != null) mangadexId = newMangaDexId;
+    if (newAniListId != null) anilistId = newAniListId;
+
+    altTitles = _deduplicateStrings([...altTitles, ...?newAltTitles], title);
+    themes = _sortTags([...themes, ...?newTags], mangadexId, anilistId);
+
+    if (newCoverPath != null && newCoverPath.isNotEmpty) {
+      imagePath = newCoverPath;
+    }
+
+    _touch();
   }
 
   Map<String, dynamic> toMap() {
@@ -188,11 +238,7 @@ class Manga extends ChangeNotifier {
   }
 
   void updateAltTitles(List<String> newAltTitles) {
-    final List<String> clean = newAltTitles
-        .map((t) => t.trim())
-        .where((t) => t.isNotEmpty && t.toLowerCase() != title.toLowerCase())
-        .toList();
-    altTitles = List<String>.from(clean);
+    altTitles = _deduplicateStrings(newAltTitles, title);
     _touch();
   }
 
@@ -245,6 +291,7 @@ class Manga extends ChangeNotifier {
   void updateTitle(String newTitle) {
     if (newTitle.isNotEmpty) {
       title = newTitle;
+      altTitles = _deduplicateStrings(altTitles, title);
       _touch();
     }
   }

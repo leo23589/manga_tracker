@@ -1,6 +1,6 @@
 # Manga Tracker 📚
 
-A modern, fast, and feature-rich Flutter application to track your manga reading progress, import titles from MangaDex, and automatically sync read chapters via a custom Firefox Mobile extension.
+A modern, fast, and feature-rich Flutter application to track your manga/manhwa reading progress, search & link titles with **MangaDex** and **AniList**, and automatically sync read chapters via a custom Firefox Mobile extension.
 
 ![Manga Tracker Mascot](assets/images/orange_cat.png)
 
@@ -8,24 +8,28 @@ A modern, fast, and feature-rich Flutter application to track your manga reading
 
 ## ✨ Features
 
-- **📖 MangaDex API Integration**:
-  - Search online titles directly across [MangaDex](https://mangadex.org).
-  - Prefers official English titles while supporting multilingual search (Japanese, Romaji, French, Spanish, etc.).
-  - 1-tap **"Add to My Library"** or **"Link / Sync with MangaDex"** for existing library items.
-  - Automatically downloads cover art images locally to your device.
+- **📖 MangaDex & 🌸 AniList Multi-Provider API Integration**:
+  - Search online titles directly across [MangaDex](https://mangadex.org) and [AniList GraphQL API](https://anilist.co).
+  - Prefers official English titles while deduplicating alternative titles (`altTitles`) and tags.
+  - Distinct provider badges: **`MangaDex 🔗`** (Indigo) and **`AniList 🌸`** (Blue). A single title can be linked to both providers simultaneously!
+  - **Cover-Only Grid Picker**: Browse multi-volume cover art grids without distracting text to pick your favorite cover image.
+  - Automatically downloads cover art images locally for 100% offline access.
 
 - **🦊 Firefox Extension Real-Time Sync**:
-  - Firefox Mobile & Desktop WebExtension that auto-syncs your read chapters when closing tabs on your favorite reading sites (e.g. MangaDex, Manganato, ReadManga).
-  - Automatically filters non-chapter URLs (e.g. `/about`, `/contact`, `/user`).
-  - **Quick Add Suggestions**: Displays a floating banner with cover art and a `[ Quick Add ]` button when you read a new manga not yet in your library.
-  - Enforces strictly superior chapter updates so older chapter re-reads never overwrite your latest progress.
+  - Firefox Mobile & Desktop WebExtension that auto-syncs read chapters when closing tabs on your favorite sites (`mangadex.org`, `manganato.com`, `mgeko.cc`, `manganami.com`, etc.).
+  - **Smart Chapter vs Title Detection**:
+    - **Chapter Links** (`/chapter-188`) ➔ Automatically updates chapter progress or prompts to add as **`Reading`**.
+    - **Title Info Pages** (`/title/uuid/manga-name`) ➔ Automatically suggests adding as **`Plan to Read`**.
+  - **Near Full-Screen Queue Modal**: Stacks all closed tabs into an expandable card queue with individual `[Link to Existing]`, `[Skip]`, or `[Add New]` actions.
 
-- **🔔 Native System Notifications**:
-  - Sends phone notifications when chapters update or when new manga suggestions are detected.
+- **🔔 System Notifications & 30-Day Activity Logs**:
+  - Sends phone notifications when chapters update, when new suggestions are detected, or when library titles are already up to date.
+  - **Activity Log Drawer 🔔**: Tap the bell icon on the Home Page to view recent sync logs with relative timestamps (*"5m ago"*, *"Yesterday"*). Logs are **automatically purged after 30 days**.
 
-- **🏷️ Reading Statuses**:
-  - Track titles by status: `Reading`, `Finished`, `On Hold`, `Dropped`, or `Plan to Read`.
-  - Filter your local library by status with 1-tap filter chips.
+- **🔍 Home Page Quick Search & Custom Filters**:
+  - Search library titles and alternative titles directly from the Home Page search bar.
+  - Filter chips for status (`Reading`, `Finished`, `Plan to Read`, `On Hold`, `Dropped`) and link status (`Linked 🔗` / `Not Linked 📍`).
+  - **Format Exclusivity**: Enforces mutual exclusivity between `Manga` and `Manhwa` content tags.
 
 - **📦 100% Offline & Embedded Base64 Backup**:
   - All cover art and library data are saved locally on your device disk.
@@ -35,6 +39,7 @@ A modern, fast, and feature-rich Flutter application to track your manga reading
 - **🎨 Midnight Dark Theme & Cat Mascot**:
   - Deep Midnight OLED dark theme (`#0F0F14`).
   - Custom 2D calico cat mascot and startup splash screen with a percentage progress bar (`0%` ➔ `100%`).
+  - High-resolution native Android launcher icon centered with padding so no paws or tails are clipped.
 
 ---
 
@@ -49,16 +54,16 @@ A modern, fast, and feature-rich Flutter application to track your manga reading
                         ▼
  ┌──────────────────────────────────────────────┐
  │  Manga Tracker App (Local Background Server) │
- │  - Normalizes title slugs (e.g. one-piece)   │
- │  - Updates local chapter if > current        │
- │  - Prompts "Quick Add" banner if missing      │
- └──────────────────────┬───────────────────────┘
-                        │
-                        ▼
- ┌──────────────────────────────────────────────┐
- │  MangaDex REST API (https://api.mangadex.org)│
- │  - Fetches English titles, covers, synopses  │
- └──────────────────────────────────────────────┘
+ │  - Normalizes title slugs & cleans hashes    │
+ │  - Matches local titles, altTitles & URLs    │
+ │  - Prompts Near Full-Screen Queue Modal      │
+ └──────────────┬────────────────────────┬──────┘
+                │                        │
+                ▼                        ▼
+ ┌────────────────────────┐  ┌────────────────────────┐
+ │  MangaDex REST API     │  │  AniList GraphQL API   │
+ │  (https://mangadex.org)│  │  (https://anilist.co)  │
+ └────────────────────────┘  └────────────────────────┘
 ```
 
 ---
@@ -87,13 +92,14 @@ A modern, fast, and feature-rich Flutter application to track your manga reading
 
 ---
 
-## 🦊 Setting Up the Firefox Extension
+## 🦊 Installing the Firefox Extension Permanently
 
-1. Open Firefox Desktop or Firefox Nightly on your phone.
-2. Go to `about:debugging#/runtime/this-firefox` (or connect your phone via USB debugging).
-3. Click **Load Temporary Add-on...** and select `extension/manifest.json`.
-4. Open extension options to manage your allowed site list (e.g., `mangadex.org`, `manganato.com`).
-5. Click **"Test Connection to App"** while the Flutter app is running to verify connection!
+1. **Option A (Firefox Mobile / Desktop via AMO Self-Signing)**:
+   * Upload `manga_tracker_extension.xpi` to [addons.mozilla.org/developers/addon/submit/upload-unlisted](https://addons.mozilla.org/en-US/developers/addon/submit/upload-unlisted).
+   * Mozilla signs it in ~2 mins. Tap the resulting download link in Firefox on your phone to install **permanently**!
+
+2. **Option B (Temporary Loading)**:
+   * Open Firefox ➔ `about:debugging` ➔ **Load Temporary Add-on...** ➔ Select `extension/manifest.json`.
 
 ---
 
@@ -115,8 +121,8 @@ The output file is located at `build/app/outputs/flutter-apk/app-release.apk`.
 
 ## 📜 Credits & Acknowledgments
 
-- **MangaDex API**: This application uses the free, open [MangaDex REST API](https://api.mangadex.org) for searching manga, retrieving cover art, synopses, and genre tags. MangaDex is an independent, non-commercial manga platform. All manga titles and cover art remain the property of their respective creators and publishers.
+- **MangaDex API**: Uses the free, open [MangaDex REST API](https://api.mangadex.org) for searching titles, cover arts, and tags.
+- **AniList API**: Uses the free [AniList GraphQL API](https://graphql.anilist.co) for anime and manga database integration.
 - **Flutter & Dart**: Built with Flutter and Material 3.
 - **Provider**: For state management.
 - **Flutter Local Notifications**: For native device notifications.
-- **Path Provider & Share Plus**: For local storage and JSON backup export/import.
