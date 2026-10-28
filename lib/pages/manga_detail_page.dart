@@ -85,13 +85,14 @@ class _MangaDetailPageState extends State<MangaDetailPage> {
               ),
               ListTile(
                 leading: const Icon(Icons.grid_view, color: Colors.indigoAccent),
-                title: const Text("Search Cover Grid on MangaDex"),
+                title: const Text("Search Cover Grid (MangaDex & AniList)"),
                 onTap: () {
                   Navigator.pop(sheetContext);
                   showMangaDexCoverPickerDialog(
                     parentContext: context,
                     mangaTitle: manga.title,
                     mangaDexId: manga.mangadexId,
+                    aniListId: manga.anilistId,
                     onSelectCover: (localPath) {
                       manga.updateImage(localPath);
                       setState(() => _temporaryImagePath = localPath);

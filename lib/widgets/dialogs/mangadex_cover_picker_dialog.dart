@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../services/anilist_service.dart';
 import '../../services/mangadex_service.dart';
 import '../manga_cover_image.dart';
 
@@ -6,6 +7,7 @@ void showMangaDexCoverPickerDialog({
   required BuildContext parentContext,
   required String mangaTitle,
   String? mangaDexId,
+  int? aniListId,
   required Function(String localCoverPath) onSelectCover,
 }) {
   List<String> coverUrls = <String>[];
@@ -28,10 +30,34 @@ void showMangaDexCoverPickerDialog({
             });
 
             try {
-              final urls = await MangaDexService.getMangaCoverUrls(mangaId: mangaDexId, query: mangaTitle);
+              final List<String> combinedCovers = <String>[];
+
+              // 1. Fetch MangaDex Covers
+              try {
+                final dexCovers = await MangaDexService.getMangaCoverUrls(mangaId: mangaDexId, query: mangaTitle);
+                combinedCovers.addAll(dexCovers);
+              } catch (_) {}
+
+              // 2. Fetch AniList Covers
+              try {
+                if (aniListId != null) {
+                  final aniCover = await AniListService.getCoverByMediaId(aniListId);
+                  if (aniCover != null && !combinedCovers.contains(aniCover)) {
+                    combinedCovers.insert(0, aniCover);
+                  }
+                } else {
+                  final aniResults = await AniListService.searchManga(mangaTitle);
+                  for (final res in aniResults) {
+                    if (res.coverUrl != null && !combinedCovers.contains(res.coverUrl)) {
+                      combinedCovers.add(res.coverUrl!);
+                    }
+                  }
+                }
+              } catch (_) {}
+
               if (context.mounted) {
                 setState(() {
-                  coverUrls = urls;
+                  coverUrls = combinedCovers;
                   isLoading = false;
                 });
               }
@@ -67,9 +93,9 @@ void showMangaDexCoverPickerDialog({
                       ),
                     ),
                     const SizedBox(height: 12),
-                    Text(
-                      "Select Cover",
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                    const Text(
+                      "Select Cover (MangaDex & AniList)",
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 16),
                     Expanded(
@@ -93,7 +119,7 @@ void showMangaDexCoverPickerDialog({
                                   ),
                                 )
                               : coverUrls.isEmpty
-                                  ? const Center(child: Text("No covers found."))
+                                  ? const Center(child: Text("No covers found across MangaDex or AniList."))
                                   : GridView.builder(
                                       controller: scrollController,
                                       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(

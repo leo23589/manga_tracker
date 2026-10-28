@@ -110,11 +110,14 @@ class DisplayTagList extends StatelessWidget {
         if (tag == "MangaDex" || tag == "Linked") {
           effectiveBackgroundColor = const Color(0xFF4F46E5);
           effectiveTextColor = Colors.white;
-          avatar = const Icon(Icons.link, size: 14, color: Colors.amberAccent);
+          avatar = const Text("🐱", style: TextStyle(fontSize: 12));
         } else if (tag == "AniList") {
           effectiveBackgroundColor = const Color(0xFF0284C7);
           effectiveTextColor = Colors.white;
-          avatar = const Icon(Icons.auto_awesome, size: 14, color: Colors.cyanAccent);
+          avatar = const Text("🌸", style: TextStyle(fontSize: 12));
+        } else if (tag == "Manhwa") {
+          effectiveBackgroundColor = const Color(0xFFD97706); // Vibrant Amber/Orange for Manhwa
+          effectiveTextColor = Colors.white;
         } else if (AppConstants.content.contains(tag)) {
           effectiveBackgroundColor = contentTagColor ?? Colors.red.shade900;
         } else if (AppConstants.themes.contains(tag)) {
@@ -132,7 +135,7 @@ class DisplayTagList extends StatelessWidget {
           labelStyle: TextStyle(
             color: effectiveTextColor,
             fontSize: 12,
-            fontWeight: isSpecialTag ? FontWeight.bold : FontWeight.normal,
+            fontWeight: isSpecialTag || tag == "Manhwa" ? FontWeight.bold : FontWeight.normal,
           ),
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
           visualDensity: VisualDensity.compact,
@@ -141,7 +144,9 @@ class DisplayTagList extends StatelessWidget {
             side: BorderSide(
               color: tag == "MangaDex" || tag == "Linked"
                   ? const Color(0xFF818CF8)
-                  : (tag == "AniList" ? const Color(0xFF38BDF8) : Colors.grey.shade700),
+                  : (tag == "AniList"
+                      ? const Color(0xFF38BDF8)
+                      : (tag == "Manhwa" ? const Color(0xFFFBBF24) : Colors.grey.shade700)),
             ),
           ),
         );
