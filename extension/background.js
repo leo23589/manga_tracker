@@ -16,6 +16,21 @@ const IGNORED_PATHS = [
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// In-memory cache of allowed sites for 0ms instant tab closure checks
+let cachedAllowedSites = [...DEFAULT_SITES];
+
+browser.storage.local.get({ allowedSites: DEFAULT_SITES }).then((result) => {
+  if (result && result.allowedSites) {
+    cachedAllowedSites = result.allowedSites;
+  }
+});
+
+browser.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && changes.allowedSites) {
+    cachedAllowedSites = changes.allowedSites.newValue || DEFAULT_SITES;
+  }
+});
+
 // Cache of tab ID -> last visited URL
 const tabUrlMap = new Map();
 
@@ -31,19 +46,16 @@ browser.tabs.onRemoved.addListener((tabId, removeInfo) => {
 
   if (!url) return;
 
-  browser.storage.local.get({ allowedSites: DEFAULT_SITES }).then((result) => {
-    const allowedSites = result.allowedSites || DEFAULT_SITES;
-    const isAllowedSite = allowedSites.some((site) => url.toLowerCase().includes(site.toLowerCase()));
+  // Instant synchronous check using in-memory cached site list
+  const isAllowedSite = cachedAllowedSites.some((site) => url.toLowerCase().includes(site.toLowerCase()));
 
-    if (isAllowedSite) {
-      processAndSendMangaData(url);
-    }
-  });
+  if (isAllowedSite) {
+    processAndSendMangaData(url);
+  }
 });
 
 /**
- * Parses manga URL.
- * Supports mangadex (/title/uuid/slug), manganami (/manga/slug/chapter-188), mgeko.cc, etc.
+ * Parses manga URL and sends instant HTTP POST update to app server.
  */
 function processAndSendMangaData(url) {
   try {
@@ -53,7 +65,7 @@ function processAndSendMangaData(url) {
       return;
     }
 
-    console.log("Manga Tracker Sync: Sending update to app:", parsed);
+    console.log("Manga Tracker Sync: Sending instant update to app:", parsed);
 
     fetch("http://127.0.0.1:8080/update", {
       method: "POST",
@@ -99,6 +111,7 @@ function parseMangaUrl(urlString) {
       const combinedMatch = part.match(/^(.+?)[-_]chapter[-_]([0-9]+(?:\.[0-9]+)?)(?:[-_].*)?$/i);
       if (combinedMatch) {
         let titleSlug = combinedMatch[1]
+          .replace(/-(?:[a-z0-9]{4,7})$/i, "")
           .replace(/^(manga|read)-/, "")
           .replace(/-(manga|read)$/, "")
           .trim();
@@ -128,7 +141,6 @@ function parseMangaUrl(urlString) {
     }
 
     // Extract title slug
-    // Skip UUIDs, generic keywords, chapter segments
     let titleSlug = "";
     for (let i = 0; i < pathParts.length; i++) {
       const part = pathParts[i];
@@ -142,6 +154,7 @@ function parseMangaUrl(urlString) {
     }
 
     titleSlug = titleSlug
+      .replace(/-(?:[a-z0-9]{4,7})$/i, "")
       .replace(/^(manga|read)-/, "")
       .replace(/-(manga|read)$/, "")
       .trim();

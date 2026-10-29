@@ -14,13 +14,15 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
+  double _progress = 0.0;
+  String _status = "Initializing...";
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 600),
+      duration: const Duration(milliseconds: 800),
     )..repeat(reverse: true);
 
     _fadeAnimation = Tween<double>(begin: 0.85, end: 1.0).animate(
@@ -28,18 +30,42 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     );
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _quickLaunch();
+      _startInitialization();
     });
   }
 
-  void _quickLaunch() {
+  Future<void> _startInitialization() async {
+    // Step 1: Initialize local collection data (0% -> 40%)
+    if (mounted) {
+      setState(() {
+        _progress = 0.4;
+        _status = "Loading library data...";
+      });
+    }
+
     final collection = context.read<MangaCollectionData>();
     final serverService = context.read<ExtensionServerService>();
 
-    // Start background sync server in non-blocking background thread
-    serverService.startServer(collection);
+    // Step 2: Bind local extension sync server (40% -> 80%)
+    if (mounted) {
+      setState(() {
+        _progress = 0.8;
+        _status = "Starting extension sync server...";
+      });
+    }
 
-    // Instant navigation to MainScreen
+    await serverService.startServer(collection);
+
+    // Step 3: Complete (80% -> 100%)
+    if (mounted) {
+      setState(() {
+        _progress = 1.0;
+        _status = "Ready!";
+      });
+    }
+
+    await Future.delayed(const Duration(milliseconds: 150));
+
     if (mounted) {
       Navigator.of(context).pushReplacement(
         PageRouteBuilder<void>(
@@ -47,7 +73,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return FadeTransition(opacity: animation, child: child);
           },
-          transitionDuration: const Duration(milliseconds: 200),
+          transitionDuration: const Duration(milliseconds: 250),
         ),
       );
     }
@@ -61,39 +87,114 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
   @override
   Widget build(BuildContext context) {
+    final int percent = (_progress * 100).toInt();
+
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F14),
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            FadeTransition(
-              opacity: _fadeAnimation,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(24),
-                child: Image.asset(
-                  'assets/images/orange_cat.png',
-                  width: 160,
-                  height: 160,
-                  fit: BoxFit.contain,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 40.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              FadeTransition(
+                opacity: _fadeAnimation,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(24),
+                  child: Image.asset(
+                    'assets/images/orange_cat.png',
+                    width: 170,
+                    height: 170,
+                    fit: BoxFit.contain,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              "Manga Tracker",
-              style: TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.2,
-                color: Color(0xFFF3F4F6),
+              const SizedBox(height: 28),
+              const Text(
+                "Manga Tracker",
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.2,
+                  color: Color(0xFFF3F4F6),
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            const CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF6366F1)),
-          ],
+              const SizedBox(height: 6),
+              const Text(
+                "Your Personal Manga Library",
+                style: TextStyle(fontSize: 13, color: Colors.white54),
+              ),
+              const SizedBox(height: 36),
+
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    _status,
+                    style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w500),
+                  ),
+                  Text(
+                    "$percent%",
+                    style: const TextStyle(
+                      color: Color(0xFF818CF8),
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: AnimatedLinearProgressIndicator(
+                  value: _progress,
+                  minHeight: 8,
+                  backgroundColor: const Color(0xFF1E1E28),
+                  color: const Color(0xFF6366F1),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
+    );
+  }
+}
+
+class AnimatedLinearProgressIndicator extends StatelessWidget {
+  final double value;
+  final double minHeight;
+  final Color backgroundColor;
+  final Color color;
+
+  const AnimatedLinearProgressIndicator({
+    super.key,
+    required this.value,
+    required this.minHeight,
+    required this.backgroundColor,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Container(
+          width: constraints.maxWidth,
+          height: minHeight,
+          color: backgroundColor,
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeInOut,
+              width: constraints.maxWidth * value,
+              height: minHeight,
+              color: color,
+            ),
+          ),
+        );
+      },
     );
   }
 }
