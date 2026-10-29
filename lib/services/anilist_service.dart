@@ -101,6 +101,39 @@ class AniListService {
     return null;
   }
 
+  static bool _isLatinScript(String text) {
+    if (text.isEmpty) return false;
+    final bool hasKorean = RegExp(r'[\uAC00-\uD7A3\u1100-\u11FF\u3130-\u318F]').hasMatch(text);
+    final bool hasJapanese = RegExp(r'[\u3040-\u30FF\u4E00-\u9FFF]').hasMatch(text);
+    return !hasKorean && !hasJapanese;
+  }
+
+  static String _extractBestEnglishTitle(Map<String, dynamic> titleMap, dynamic synonyms) {
+    final String english = (titleMap['english'] as String? ?? '').trim();
+    if (english.isNotEmpty) return english;
+
+    // Search synonyms for Latin/English title
+    if (synonyms is List) {
+      for (final dynamic s in synonyms) {
+        if (s != null) {
+          final String syn = s.toString().trim();
+          if (syn.isNotEmpty && _isLatinScript(syn)) {
+            return syn;
+          }
+        }
+      }
+    }
+
+    final String romaji = (titleMap['romaji'] as String? ?? '').trim();
+    if (romaji.isNotEmpty && _isLatinScript(romaji)) return romaji;
+
+    final String native = (titleMap['native'] as String? ?? '').trim();
+    if (romaji.isNotEmpty) return romaji;
+    if (native.isNotEmpty) return native;
+
+    return 'Untitled';
+  }
+
   static Future<List<AniListSearchResult>> searchManga(String query) async {
     if (query.trim().isEmpty) return <AniListSearchResult>[];
 
@@ -152,21 +185,19 @@ class AniListService {
 
         final int id = item['id'] as int? ?? 0;
         final Map<String, dynamic> titleMap = item['title'] as Map<String, dynamic>? ?? {};
+        final dynamic synonyms = item['synonyms'];
 
         final String english = titleMap['english'] as String? ?? '';
         final String romaji = titleMap['romaji'] as String? ?? '';
         final String native = titleMap['native'] as String? ?? '';
 
-        final String primaryTitle = english.isNotEmpty
-            ? english
-            : (romaji.isNotEmpty ? romaji : (native.isNotEmpty ? native : 'Untitled'));
+        final String primaryTitle = _extractBestEnglishTitle(titleMap, synonyms);
 
         final List<String> altList = <String>[];
         if (english.isNotEmpty && english.toLowerCase() != primaryTitle.toLowerCase()) altList.add(english);
         if (romaji.isNotEmpty && romaji.toLowerCase() != primaryTitle.toLowerCase()) altList.add(romaji);
         if (native.isNotEmpty && native.toLowerCase() != primaryTitle.toLowerCase()) altList.add(native);
 
-        final dynamic synonyms = item['synonyms'];
         if (synonyms is List) {
           for (final dynamic s in synonyms) {
             if (s != null && s.toString().trim().isNotEmpty) {
