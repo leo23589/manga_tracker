@@ -112,15 +112,32 @@ class AniListService {
     final String english = (titleMap['english'] as String? ?? '').trim();
     if (english.isNotEmpty) return english;
 
-    // Search synonyms for Latin/English title
+    final List<String> allCandidates = <String>[];
     if (synonyms is List) {
       for (final dynamic s in synonyms) {
         if (s != null) {
           final String syn = s.toString().trim();
-          if (syn.isNotEmpty && _isLatinScript(syn)) {
-            return syn;
-          }
+          if (syn.isNotEmpty) allCandidates.add(syn);
         }
+      }
+    }
+
+    final RegExp englishTitlePattern = RegExp(
+      r'\b(the|a|an|leveling|solo|return|hero|tower|player|rank|system|god|lord|king|princess|queen|demon|magic|sword|reincarnation|villain|extra|guide|strategy|conquer|hunter|necromancer|archmage|academy|saint|dungeon|master|heavenly|dragon|star|shadow|blade|realm|emperor|legend|infinite|regressor|transmigrated)\b',
+      caseSensitive: false,
+    );
+
+    // Check synonyms for candidate with English keywords
+    for (final String candidate in allCandidates) {
+      if (_isLatinScript(candidate) && englishTitlePattern.hasMatch(candidate)) {
+        return candidate;
+      }
+    }
+
+    // Check synonyms for any non-hyphenated Latin title
+    for (final String candidate in allCandidates) {
+      if (_isLatinScript(candidate) && !candidate.contains('-')) {
+        return candidate;
       }
     }
 

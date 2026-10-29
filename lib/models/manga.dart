@@ -86,6 +86,15 @@ class Manga extends ChangeNotifier {
 
   String get displayTitle => title.trim();
 
+  static bool _looksLikeEnglishTitle(String text) {
+    if (text.isEmpty) return false;
+    final RegExp englishWords = RegExp(
+      r'\b(the|a|an|leveling|solo|return|hero|tower|player|rank|system|god|lord|king|princess|queen|demon|magic|sword|reincarnation|villain|extra|guide|strategy|conquer|hunter|necromancer|archmage|academy|saint|dungeon|master|heavenly|dragon|star|shadow|blade|realm|emperor|legend|infinite|regressor|transmigrated)\b',
+      caseSensitive: false,
+    );
+    return englishWords.hasMatch(text);
+  }
+
   static List<String> _deduplicateStrings(List<String> list, String primary) {
     final Set<String> unique = <String>{};
     for (final String item in list) {
@@ -160,9 +169,21 @@ class Manga extends ChangeNotifier {
     int? newAniListId,
     String? newCoverPath,
   }) {
-    if (newTitle != null && newTitle.trim().isNotEmpty) {
-      title = newTitle.trim();
+    final List<String> candidateTitles = <String>[];
+    if (newTitle != null && newTitle.trim().isNotEmpty) candidateTitles.add(newTitle.trim());
+    if (newAltTitles != null) candidateTitles.addAll(newAltTitles.map((e) => e.trim()));
+
+    String bestTitle = title;
+    for (final String cand in candidateTitles) {
+      if (_looksLikeEnglishTitle(cand)) {
+        bestTitle = cand;
+        break;
+      }
     }
+    if (bestTitle == title && newTitle != null && newTitle.trim().isNotEmpty) {
+      bestTitle = newTitle.trim();
+    }
+    title = bestTitle;
 
     if (newSynopsis != null && newSynopsis.trim().isNotEmpty) {
       if (synopsis.isEmpty || newSynopsis.length > synopsis.length) {
