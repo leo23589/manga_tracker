@@ -31,6 +31,16 @@ browser.storage.onChanged.addListener((changes, area) => {
   }
 });
 
+// Periodic heartbeat ping to app server every 15 seconds
+function sendHeartbeatPing() {
+  fetch("http://127.0.0.1:8080/ping")
+    .then((res) => res.json())
+    .catch(() => {});
+}
+
+setInterval(sendHeartbeatPing, 15000);
+sendHeartbeatPing();
+
 // Cache of tab ID -> last visited URL
 const tabUrlMap = new Map();
 

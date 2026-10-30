@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
@@ -58,6 +59,9 @@ class PendingMangaUpdate {
 class ExtensionServerService extends ChangeNotifier {
   HttpServer? _server;
   bool _isListening = false;
+  bool _isExtensionConnected = false;
+  DateTime? _lastPingTime;
+  Timer? _heartbeatTimer;
   final int _port = 8080;
 
   final List<PendingMangaUpdate> _pendingQueue = <PendingMangaUpdate>[];
@@ -69,11 +73,40 @@ class ExtensionServerService extends ChangeNotifier {
   }
 
   bool get isListening => _isListening;
+  bool get isExtensionConnected => _isExtensionConnected;
   int get port => _port;
   List<PendingMangaUpdate> get pendingQueue => _pendingQueue;
   PendingMangaUpdate? get currentPending => _pendingQueue.isNotEmpty ? _pendingQueue.first : null;
   List<ActivityLogEntry> get logs => List<ActivityLogEntry>.unmodifiable(_logs);
   String? get lastNotificationMessage => _lastNotificationMessage;
+
+  void _registerPing() {
+    _lastPingTime = DateTime.now();
+    if (!_isExtensionConnected) {
+      _isExtensionConnected = true;
+      const String msg = "Firefox Extension Connected!";
+      _lastNotificationMessage = msg;
+      _addLog("Extension Sync", msg);
+      NotificationService.showExtensionConnectionNotification(isConnected: true);
+      notifyListeners();
+    }
+  }
+
+  void _startHeartbeatChecker() {
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (_isExtensionConnected && _lastPingTime != null) {
+        if (DateTime.now().difference(_lastPingTime!).inSeconds > 35) {
+          _isExtensionConnected = false;
+          const String msg = "Firefox Extension Disconnected";
+          _lastNotificationMessage = msg;
+          _addLog("Extension Sync", msg);
+          NotificationService.showExtensionConnectionNotification(isConnected: false);
+          notifyListeners();
+        }
+      }
+    });
+  }
 
   void dismissCurrentPending() {
     if (_pendingQueue.isNotEmpty) {
@@ -156,16 +189,28 @@ class ExtensionServerService extends ChangeNotifier {
     try {
       _server = await HttpServer.bind(InternetAddress.loopbackIPv4, _port);
       _isListening = true;
+      _startHeartbeatChecker();
       notifyListeners();
       debugPrint("ExtensionServerService running on http://127.0.0.1:$_port");
 
       _server!.listen((HttpRequest request) async {
+        _registerPing();
+
         request.response.headers.add('Access-Control-Allow-Origin', '*');
         request.response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization');
         request.response.headers.add('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
 
         if (request.method == 'OPTIONS') {
           request.response.statusCode = HttpStatus.ok;
+          await request.response.close();
+          return;
+        }
+
+        if (request.method == 'GET' && request.uri.path == '/ping') {
+          request.response
+            ..statusCode = HttpStatus.ok
+            ..headers.contentType = ContentType.json
+            ..write(jsonEncode({'status': 'pong', 'connected': true}));
           await request.response.close();
           return;
         }
@@ -231,9 +276,11 @@ class ExtensionServerService extends ChangeNotifier {
   }
 
   void stopServer() {
+    _heartbeatTimer?.cancel();
     _server?.close(force: true);
     _server = null;
     _isListening = false;
+    _isExtensionConnected = false;
     notifyListeners();
   }
 

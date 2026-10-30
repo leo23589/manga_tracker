@@ -134,4 +134,37 @@ class NotificationService {
       debugPrint("Error displaying suggestion notification: $e");
     }
   }
+
+  static Future<void> showExtensionConnectionNotification({
+    required bool isConnected,
+  }) async {
+    await initialize();
+
+    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+      'extension_connection_channel',
+      'Extension Connection Status',
+      channelDescription: 'Notifications when Firefox extension connects or disconnects',
+      importance: Importance.defaultImportance,
+      priority: Priority.defaultPriority,
+      icon: '@mipmap/ic_launcher',
+    );
+
+    const NotificationDetails details = NotificationDetails(
+      android: androidDetails,
+      iOS: DarwinNotificationDetails(),
+    );
+
+    try {
+      await _notificationsPlugin.show(
+        (DateTime.now().millisecondsSinceEpoch ~/ 1000) + 3,
+        isConnected ? '🦊 Firefox Extension Connected' : '🦊 Firefox Extension Disconnected',
+        isConnected
+            ? 'Firefox extension is now synced with Manga Tracker!'
+            : 'Connection lost with Firefox extension.',
+        details,
+      );
+    } catch (e) {
+      debugPrint("Error displaying connection notification: $e");
+    }
+  }
 }
