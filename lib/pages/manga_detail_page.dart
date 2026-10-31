@@ -117,6 +117,102 @@ class _MangaDetailPageState extends State<MangaDetailPage> {
     );
   }
 
+  void _showAddAltTitleDialog(Manga manga) {
+    final TextEditingController altController = TextEditingController();
+
+    showDialog<void>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text("Add Alternative Title"),
+          content: TextField(
+            controller: altController,
+            autofocus: true,
+            decoration: const InputDecoration(
+              hintText: "e.g. English or Romaji Title...",
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final String text = altController.text.trim();
+                if (text.isNotEmpty) {
+                  manga.updateAltTitles([...manga.altTitles, text]);
+                  Navigator.pop(dialogContext);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Added alternative title "$text"'), backgroundColor: Colors.green),
+                  );
+                }
+              },
+              child: const Text("Add"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showAltTitleActionSheet(Manga manga, String selectedAltTitle) {
+    showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext sheetContext) {
+        return Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                selectedAltTitle,
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: const Icon(Icons.swap_horiz, color: Colors.indigoAccent),
+                title: const Text("Set as Main Title 🔄"),
+                subtitle: Text('Swap "${manga.title}" with "$selectedAltTitle"'),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  final String oldMainTitle = manga.title;
+                  final List<String> updatedAltList = List<String>.from(manga.altTitles)
+                    ..remove(selectedAltTitle)
+                    ..add(oldMainTitle);
+
+                  manga.updateTitle(selectedAltTitle);
+                  manga.updateAltTitles(updatedAltList);
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Swapped main title to "$selectedAltTitle"!'),
+                      backgroundColor: Colors.indigo,
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                title: const Text("Remove Alt Title", style: TextStyle(color: Colors.redAccent)),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  final List<String> updatedAltList = List<String>.from(manga.altTitles)..remove(selectedAltTitle);
+                  manga.updateAltTitles(updatedAltList);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   void _linkWithMangaDex(Manga manga) {
     showMangaDexAutofillDialog(
       parentContext: context,
@@ -321,24 +417,57 @@ class _MangaDetailPageState extends State<MangaDetailPage> {
                           textAlign: TextAlign.center,
                         ),
                       ),
-                if (!_isEditing && manga.altTitles.isNotEmpty) ...[
+                if (!_isEditing) ...[
                   const SizedBox(height: 12),
                   Center(
                     child: Wrap(
                       alignment: WrapAlignment.center,
                       spacing: 6.0,
                       runSpacing: 6.0,
-                      children: manga.altTitles.take(5).map((alt) {
-                        return Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF1E1E28),
+                      children: [
+                        ...manga.altTitles.map((alt) {
+                          return InkWell(
+                            onTap: () => _showAltTitleActionSheet(manga, alt),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.grey.shade800),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1E1E28),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.indigo.withAlpha((255 * 0.4).round())),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(alt, style: const TextStyle(fontSize: 11, color: Colors.white70)),
+                                  const SizedBox(width: 4),
+                                  const Icon(Icons.swap_horiz, size: 12, color: Colors.indigoAccent),
+                                ],
+                              ),
+                            ),
+                          );
+                        }),
+                        InkWell(
+                          onTap: () => _showAddAltTitleDialog(manga),
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF2A2A38),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.indigoAccent),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.add, size: 12, color: Colors.indigoAccent),
+                                SizedBox(width: 4),
+                                Text("Add Alt Title", style: TextStyle(fontSize: 11, color: Colors.indigoAccent, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
                           ),
-                          child: Text(alt, style: const TextStyle(fontSize: 11, color: Colors.white70)),
-                        );
-                      }).toList(),
+                        ),
+                      ],
                     ),
                   ),
                 ],

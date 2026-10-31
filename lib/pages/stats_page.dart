@@ -73,6 +73,9 @@ class StatsPage extends StatelessWidget {
     final Map<String, int> tagCounts = <String, int>{};
     for (Manga m in mangas) {
       for (String t in m.themes) {
+        if (["Manga", "Manhwa", "Manhua", "MangaDex", "AniList", "Linked"].contains(t)) {
+          continue;
+        }
         tagCounts[t] = (tagCounts[t] ?? 0) + 1;
       }
     }
@@ -89,7 +92,6 @@ class StatsPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            // Backup Section
             const Text("Backup & Restore", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
             Row(
