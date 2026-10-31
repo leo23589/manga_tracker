@@ -35,36 +35,32 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   }
 
   Future<void> _startInitialization() async {
-    // Step 1: Initialize local collection data (0% -> 40%)
-    if (mounted) {
-      setState(() {
-        _progress = 0.4;
-        _status = "Loading library data...";
-      });
-    }
+    if (!mounted) return;
+    setState(() {
+      _progress = 0.35;
+      _status = "Loading library data...";
+    });
+    await Future.delayed(const Duration(milliseconds: 180));
 
+    if (!mounted) return;
     final collection = context.read<MangaCollectionData>();
     final serverService = context.read<ExtensionServerService>();
 
-    // Step 2: Bind local extension sync server (40% -> 80%)
-    if (mounted) {
-      setState(() {
-        _progress = 0.8;
-        _status = "Starting extension sync server...";
-      });
-    }
+    setState(() {
+      _progress = 0.75;
+      _status = "Starting extension sync server...";
+    });
 
     await serverService.startServer(collection);
+    await Future.delayed(const Duration(milliseconds: 180));
 
-    // Step 3: Complete (80% -> 100%)
-    if (mounted) {
-      setState(() {
-        _progress = 1.0;
-        _status = "Ready!";
-      });
-    }
+    if (!mounted) return;
+    setState(() {
+      _progress = 1.0;
+      _status = "Ready!";
+    });
 
-    await Future.delayed(const Duration(milliseconds: 150));
+    await Future.delayed(const Duration(milliseconds: 200));
 
     if (mounted) {
       Navigator.of(context).pushReplacement(
@@ -73,7 +69,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return FadeTransition(opacity: animation, child: child);
           },
-          transitionDuration: const Duration(milliseconds: 250),
+          transitionDuration: const Duration(milliseconds: 300),
         ),
       );
     }
@@ -186,7 +182,7 @@ class AnimatedLinearProgressIndicator extends StatelessWidget {
           child: Align(
             alignment: Alignment.centerLeft,
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
+              duration: const Duration(milliseconds: 250),
               curve: Curves.easeInOut,
               width: constraints.maxWidth * value,
               height: minHeight,

@@ -101,51 +101,52 @@ class AniListService {
     return null;
   }
 
-  static bool _isLatinScript(String text) {
+  static bool _hasAsianScript(String text) {
     if (text.isEmpty) return false;
     final bool hasKorean = RegExp(r'[\uAC00-\uD7A3\u1100-\u11FF\u3130-\u318F]').hasMatch(text);
     final bool hasJapanese = RegExp(r'[\u3040-\u30FF\u4E00-\u9FFF]').hasMatch(text);
-    return !hasKorean && !hasJapanese;
+    return hasKorean || hasJapanese;
+  }
+
+  static bool _looksLikeRomanizedKoreanOrJapanese(String text) {
+    if (text.isEmpty) return false;
+    final lower = text.toLowerCase();
+    final RegExp romanizedPatterns = RegExp(
+      r'(-eun|-neun|-i|-ga|-eul|-reul|-ui|-eseo|-ha-neun|cheonhwa|na-honja|cheolsu|gwi-hwan|so-seol|jak-ga|seon-bae|no-hwan|bok-su)',
+      caseSensitive: false,
+    );
+    return romanizedPatterns.hasMatch(lower);
   }
 
   static String _extractBestEnglishTitle(Map<String, dynamic> titleMap, dynamic synonyms) {
     final String english = (titleMap['english'] as String? ?? '').trim();
-    if (english.isNotEmpty) return english;
+    if (english.isNotEmpty && !_hasAsianScript(english)) return english;
 
-    final List<String> allCandidates = <String>[];
+    final List<String> candidates = <String>[];
     if (synonyms is List) {
       for (final dynamic s in synonyms) {
         if (s != null) {
           final String syn = s.toString().trim();
-          if (syn.isNotEmpty) allCandidates.add(syn);
+          if (syn.isNotEmpty && !_hasAsianScript(syn)) candidates.add(syn);
         }
       }
     }
 
-    final RegExp englishTitlePattern = RegExp(
-      r'\b(the|a|an|leveling|solo|return|hero|tower|player|rank|system|god|lord|king|princess|queen|demon|magic|sword|reincarnation|villain|extra|guide|strategy|conquer|hunter|necromancer|archmage|academy|saint|dungeon|master|heavenly|dragon|star|shadow|blade|realm|emperor|legend|infinite|regressor|transmigrated)\b',
-      caseSensitive: false,
-    );
-
-    // Check synonyms for candidate with English keywords
-    for (final String candidate in allCandidates) {
-      if (_isLatinScript(candidate) && englishTitlePattern.hasMatch(candidate)) {
-        return candidate;
-      }
-    }
-
-    // Check synonyms for any non-hyphenated Latin title
-    for (final String candidate in allCandidates) {
-      if (_isLatinScript(candidate) && !candidate.contains('-')) {
-        return candidate;
-      }
-    }
-
     final String romaji = (titleMap['romaji'] as String? ?? '').trim();
-    if (romaji.isNotEmpty && _isLatinScript(romaji)) return romaji;
 
+    // 1. Search candidates for English title that doesn't look like romanized Korean/Japanese
+    for (final String candidate in candidates) {
+      if (!_looksLikeRomanizedKoreanOrJapanese(candidate) && candidate != romaji) {
+        return candidate;
+      }
+    }
+
+    // 2. Pick first non-Asian synonym
+    if (candidates.isNotEmpty) return candidates.first;
+
+    // 3. Fallback to romaji / native
+    if (romaji.isNotEmpty && !_hasAsianScript(romaji)) return romaji;
     final String native = (titleMap['native'] as String? ?? '').trim();
-    if (romaji.isNotEmpty) return romaji;
     if (native.isNotEmpty) return native;
 
     return 'Untitled';
