@@ -430,6 +430,7 @@ class _MangaDetailPageState extends State<MangaDetailPage> {
                             onTap: () => _showAltTitleActionSheet(manga, alt),
                             borderRadius: BorderRadius.circular(8),
                             child: Container(
+                              constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width - 64),
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
                                 color: const Color(0xFF1E1E28),
@@ -439,7 +440,14 @@ class _MangaDetailPageState extends State<MangaDetailPage> {
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Text(alt, style: const TextStyle(fontSize: 11, color: Colors.white70)),
+                                  Flexible(
+                                    child: Text(
+                                      alt,
+                                      style: const TextStyle(fontSize: 11, color: Colors.white70),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
                                   const SizedBox(width: 4),
                                   const Icon(Icons.swap_horiz, size: 12, color: Colors.indigoAccent),
                                 ],
