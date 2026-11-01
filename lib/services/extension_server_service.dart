@@ -513,6 +513,14 @@ class ExtensionServerService extends ChangeNotifier {
     final PendingMangaUpdate pending = _pendingQueue.removeAt(0);
     notifyListeners();
 
+    // Auto-add pending title as alternative title if not present
+    final String cleanPendingTitle = pending.formattedTitle.trim();
+    if (cleanPendingTitle.isNotEmpty &&
+        cleanPendingTitle.toLowerCase() != targetManga.title.toLowerCase() &&
+        !targetManga.altTitles.any((a) => a.toLowerCase() == cleanPendingTitle.toLowerCase())) {
+      targetManga.updateAltTitles([...targetManga.altTitles, cleanPendingTitle]);
+    }
+
     if (pending.isChapter && pending.chapter > targetManga.currentChapter) {
       targetManga.updateChapter(pending.chapter);
       if (targetManga.status == MangaStatus.planToRead) {

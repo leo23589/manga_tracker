@@ -62,6 +62,20 @@ class MangaDexSearchResult {
 class MangaDexService {
   static const String _baseUrl = 'https://api.mangadex.org';
 
+  static bool _hasNonLatinScript(String text) {
+    if (text.isEmpty) return false;
+    final bool hasKorean = RegExp(r'[\uAC00-\uD7A3\u1100-\u11FF\u3130-\u318F]').hasMatch(text);
+    final bool hasJapanese = RegExp(r'[\u3040-\u30FF\u4E00-\u9FFF]').hasMatch(text);
+    final bool hasCyrillic = RegExp(r'[\u0400-\u04FF]').hasMatch(text);
+    final bool hasArabic = RegExp(r'[\u0600-\u06FF]').hasMatch(text);
+    return hasKorean || hasJapanese || hasCyrillic || hasArabic;
+  }
+
+  static bool _isAllowedLanguageKey(String key) {
+    final k = key.toLowerCase().trim();
+    return k == 'en' || k == 'fr' || k == 'ja-ro' || k == 'ko-ro' || k == 'ko';
+  }
+
   /// Downloads a remote cover image URL to local storage so it works 100% offline.
   static Future<String?> downloadCoverImageLocally(String? imageUrl) async {
     if (imageUrl == null || imageUrl.isEmpty) return null;
@@ -133,12 +147,12 @@ class MangaDexService {
   }
 
   /// Extracts the preferred English title from MangaDex attributes,
-  /// falling back to Romanized Japanese or first available title.
+  /// falling back to Romanized Japanese/Korean or French.
   static String _extractEnglishTitle(Map<String, dynamic> attributes) {
     final dynamic titleObj = attributes['title'];
     if (titleObj is Map && titleObj['en'] != null) {
       final String en = titleObj['en'].toString().trim();
-      if (en.isNotEmpty) return en;
+      if (en.isNotEmpty && !_hasNonLatinScript(en)) return en;
     }
 
     final dynamic altTitles = attributes['altTitles'];
@@ -146,53 +160,38 @@ class MangaDexService {
       for (final dynamic alt in altTitles) {
         if (alt is Map && alt['en'] != null) {
           final String en = alt['en'].toString().trim();
-          if (en.isNotEmpty) return en;
+          if (en.isNotEmpty && !_hasNonLatinScript(en)) return en;
         }
       }
+    }
+
+    if (titleObj is Map && titleObj['fr'] != null) {
+      final String fr = titleObj['fr'].toString().trim();
+      if (fr.isNotEmpty && !_hasNonLatinScript(fr)) return fr;
     }
 
     if (titleObj is Map && titleObj['ja-ro'] != null) {
       final String jaRo = titleObj['ja-ro'].toString().trim();
-      if (jaRo.isNotEmpty) return jaRo;
-    }
-    if (altTitles is List) {
-      for (final dynamic alt in altTitles) {
-        if (alt is Map && alt['ja-ro'] != null) {
-          final String jaRo = alt['ja-ro'].toString().trim();
-          if (jaRo.isNotEmpty) return jaRo;
-        }
-      }
+      if (jaRo.isNotEmpty && !_hasNonLatinScript(jaRo)) return jaRo;
     }
 
-    if (titleObj is Map && titleObj.values.isNotEmpty) {
-      for (final dynamic val in titleObj.values) {
-        if (val != null && val.toString().trim().isNotEmpty) {
-          return val.toString().trim();
-        }
-      }
-    }
-
-    if (altTitles is List) {
-      for (final dynamic alt in altTitles) {
-        if (alt is Map && alt.values.isNotEmpty) {
-          for (final dynamic val in alt.values) {
-            if (val != null && val.toString().trim().isNotEmpty) {
-              return val.toString().trim();
-            }
-          }
-        }
-      }
+    if (titleObj is Map && titleObj['ko-ro'] != null) {
+      final String koRo = titleObj['ko-ro'].toString().trim();
+      if (koRo.isNotEmpty && !_hasNonLatinScript(koRo)) return koRo;
     }
 
     return 'Untitled';
   }
 
-  /// Extracts the preferred English synopsis/description from MangaDex attributes.
+  /// Extracts description from MangaDex attributes.
   static String _extractEnglishSynopsis(Map<String, dynamic> attributes) {
     final dynamic descObj = attributes['description'];
     if (descObj is Map) {
       if (descObj['en'] != null && descObj['en'].toString().trim().isNotEmpty) {
         return descObj['en'].toString().trim();
+      }
+      if (descObj['fr'] != null && descObj['fr'].toString().trim().isNotEmpty) {
+        return descObj['fr'].toString().trim();
       }
       for (final dynamic val in descObj.values) {
         if (val != null && val.toString().trim().isNotEmpty) {
@@ -203,7 +202,7 @@ class MangaDexService {
     return '';
   }
 
-  /// Searches MangaDex for manga matching [query] in any language.
+  /// Searches MangaDex for manga matching [query] in English/French/Romaji.
   static Future<List<MangaDexSearchResult>> searchManga(String query) async {
     if (query.trim().isEmpty) {
       return <MangaDexSearchResult>[];
@@ -289,7 +288,6 @@ class MangaDexService {
           }
         }
 
-        // Clean up "Long Strip" and enforce mutual exclusivity (Manhwa vs Manga)
         extractedTags.removeWhere((t) => t.toLowerCase() == 'long strip');
         if (extractedTags.contains('Manhwa')) {
           extractedTags.remove('Manga');
@@ -302,11 +300,13 @@ class MangaDexService {
         if (altObj is List) {
           for (final dynamic altMap in altObj) {
             if (altMap is Map) {
-              for (final dynamic val in altMap.values) {
-                if (val != null) {
-                  final String t = val.toString().trim();
-                  if (t.isNotEmpty && t.toLowerCase() != title.toLowerCase() && !altTitlesList.contains(t)) {
-                    altTitlesList.add(t);
+              for (final MapEntry<dynamic, dynamic> entry in altMap.entries) {
+                final String langKey = entry.key.toString();
+                final String val = entry.value?.toString().trim() ?? '';
+
+                if (_isAllowedLanguageKey(langKey) && val.isNotEmpty && !_hasNonLatinScript(val)) {
+                  if (val.toLowerCase() != title.toLowerCase() && !altTitlesList.contains(val)) {
+                    altTitlesList.add(val);
                   }
                 }
               }
