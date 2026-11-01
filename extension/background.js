@@ -11,7 +11,8 @@ const DEFAULT_SITES = [
 const IGNORED_PATHS = [
   "about", "privacy", "terms", "login", "register", "contact", "faq",
   "search", "user", "profile", "bookmark", "bookmarks", "history", "home",
-  "genre", "genres", "tag", "tags", "author", "authors", "group", "groups"
+  "genre", "genres", "tag", "tags", "author", "authors", "group", "groups",
+  "jumbo", "latest", "directory", "popular"
 ];
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -107,6 +108,11 @@ function parseMangaUrl(urlString) {
     const pathname = url.pathname.toLowerCase();
     const search = url.search.toLowerCase();
     const fullPath = pathname + search;
+
+    // Explicitly ignore directory/browse/jumbo links e.g. /jumbo/manga/
+    if (pathname.includes("/jumbo/manga") || pathname.includes("/jumbo")) {
+      return null;
+    }
 
     const pathParts = pathname.split("/").filter(Boolean);
     if (pathParts.length === 0) return null; // Homepage
