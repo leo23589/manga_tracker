@@ -183,6 +183,11 @@ class Manga extends ChangeNotifier {
     if (bestTitle == title && newTitle != null && newTitle.trim().isNotEmpty) {
       bestTitle = newTitle.trim();
     }
+
+    final List<String> combinedAltList = <String>[...altTitles, ...?newAltTitles];
+    if (bestTitle.toLowerCase() != title.toLowerCase()) {
+      combinedAltList.add(title);
+    }
     title = bestTitle;
 
     if (newSynopsis != null && newSynopsis.trim().isNotEmpty) {
@@ -194,7 +199,7 @@ class Manga extends ChangeNotifier {
     if (newMangaDexId != null) mangadexId = newMangaDexId;
     if (newAniListId != null) anilistId = newAniListId;
 
-    altTitles = _deduplicateStrings([...altTitles, ...?newAltTitles], title);
+    altTitles = _deduplicateStrings(combinedAltList, title);
     themes = _sortTags([...themes, ...?newTags], mangadexId, anilistId);
 
     if (newCoverPath != null && newCoverPath.isNotEmpty) {
@@ -259,7 +264,8 @@ class Manga extends ChangeNotifier {
   }
 
   void updateAltTitles(List<String> newAltTitles) {
-    altTitles = _deduplicateStrings(newAltTitles, title);
+    final List<String> combined = <String>[...altTitles, ...newAltTitles];
+    altTitles = _deduplicateStrings(combined, title);
     _touch();
   }
 
@@ -311,8 +317,9 @@ class Manga extends ChangeNotifier {
 
   void updateTitle(String newTitle) {
     if (newTitle.isNotEmpty) {
+      final String oldTitle = title;
       title = newTitle;
-      altTitles = _deduplicateStrings(altTitles, title);
+      altTitles = _deduplicateStrings([...altTitles, oldTitle], title);
       _touch();
     }
   }

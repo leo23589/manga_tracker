@@ -45,8 +45,30 @@ sendHeartbeatPing();
 // Cache of tab ID -> last visited URL
 const tabUrlMap = new Map();
 
+// Pre-populate tabUrlMap with ALL open tabs (including background/unloaded tabs)
+function syncAllOpenTabs() {
+  browser.tabs.query({}).then((tabs) => {
+    if (tabs) {
+      tabs.forEach((tab) => {
+        if (tab.id && tab.url && tab.url.startsWith("http")) {
+          tabUrlMap.set(tab.id, tab.url);
+        }
+      });
+    }
+  }).catch(() => {});
+}
+
+syncAllOpenTabs();
+setInterval(syncAllOpenTabs, 20000);
+
+browser.tabs.onCreated.addListener((tab) => {
+  if (tab.id && tab.url && tab.url.startsWith("http")) {
+    tabUrlMap.set(tab.id, tab.url);
+  }
+});
+
 browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (tab.url) {
+  if (tab.url && tab.url.startsWith("http")) {
     tabUrlMap.set(tabId, tab.url);
   }
 });
@@ -57,7 +79,6 @@ browser.tabs.onRemoved.addListener((tabId, removeInfo) => {
 
   if (!url) return;
 
-  // Instant synchronous check using in-memory cached site list
   const isAllowedSite = cachedAllowedSites.some((site) => url.toLowerCase().includes(site.toLowerCase()));
 
   if (isAllowedSite) {
@@ -109,28 +130,35 @@ function parseMangaUrl(urlString) {
     const search = url.search.toLowerCase();
     const fullPath = pathname + search;
 
-    // Explicitly ignore directory/browse/jumbo links e.g. /jumbo/manga/
     if (pathname.includes("/jumbo/manga") || pathname.includes("/jumbo")) {
       return null;
     }
 
     const pathParts = pathname.split("/").filter(Boolean);
-    if (pathParts.length === 0) return null; // Homepage
+    if (pathParts.length === 0) return null;
     if (pathParts.some((p) => IGNORED_PATHS.includes(p))) return null;
 
     // Pattern A: Combined title + chapter in single path segment
-    // e.g. /reader/en/a-wimps-strategy-guide-to-conquer-the-tower-chapter-52-eng-li/
+    // e.g. /reader/en/482q-the-genius-knight-of-a-fallen-race-chapter-7-eng-li/
     for (let i = 0; i < pathParts.length; i++) {
       const part = pathParts[i];
       if (["manga", "title", "series", "read", "reader", "en", "comic"].includes(part)) continue;
 
       const combinedMatch = part.match(/^(.+?)[-_]chapter[-_]([0-9]+(?:\.[0-9]+)?)(?:[-_].*)?$/i);
       if (combinedMatch) {
-        let titleSlug = combinedMatch[1]
-          .replace(/-(?:[a-z0-9]{4,7})$/i, "")
-          .replace(/^(manga|read)-/, "")
-          .replace(/-(manga|read)$/, "")
+        let titleSlug = combinedMatch[1];
+
+        // Strip random hash prefixes like "482q-" or "123a-"
+        titleSlug = titleSlug.replace(/^[0-9a-z]{3,6}-/i, "");
+
+        // Strip random hash suffixes and language tags
+        titleSlug = titleSlug
+          .replace(/-(?:eng|li|raw|sub|dub|v[0-9]+)$/gi, "")
+          .replace(/-(?:[a-z0-9]{3,7})$/gi, "")
+          .replace(/^(manga|read)-/i, "")
+          .replace(/-(manga|read)$/i, "")
           .trim();
+
         const chapterNum = parseFloat(combinedMatch[2]);
 
         if (titleSlug && !isNaN(chapterNum) && chapterNum > 0) {
@@ -144,7 +172,6 @@ function parseMangaUrl(urlString) {
     }
 
     // Pattern B: Explicit chapter indicator in separate path/query
-    // e.g. /manga/cheonhwa-archives-young-master/chapter-188 or /chapter/1081
     const chapterMatch = fullPath.match(/(?:chapter|chap|ch|c)[-/_=]?([0-9]+(?:\.[0-9]+)?)/i);
     const isChapter = !!chapterMatch;
     let chapterNum = 1;
@@ -169,10 +196,13 @@ function parseMangaUrl(urlString) {
       break;
     }
 
+    // Clean hash prefixes and suffixes
+    titleSlug = titleSlug.replace(/^[0-9a-z]{3,6}-/i, "");
     titleSlug = titleSlug
-      .replace(/-(?:[a-z0-9]{4,7})$/i, "")
-      .replace(/^(manga|read)-/, "")
-      .replace(/-(manga|read)$/, "")
+      .replace(/-(?:eng|li|raw|sub|dub|v[0-9]+)$/gi, "")
+      .replace(/-(?:[a-z0-9]{3,7})$/gi, "")
+      .replace(/^(manga|read)-/i, "")
+      .replace(/-(manga|read)$/i, "")
       .trim();
 
     if (!titleSlug || titleSlug.length < 2) return null;
