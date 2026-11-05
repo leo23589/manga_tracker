@@ -160,7 +160,7 @@ class _MainScreenState extends State<MainScreen> {
                                     trailing: const Icon(Icons.link, color: Colors.indigoAccent),
                                     onTap: () {
                                       Navigator.of(dialogContext).pop();
-                                      serverService.linkCurrentPendingToExisting(manga);
+                                      serverService.linkPendingToExisting(manga, pending);
                                     },
                                   );
                                 },
@@ -349,7 +349,7 @@ class _MainScreenState extends State<MainScreen> {
                                                           InkWell(
                                                             onTap: () {
                                                               if (pending.chapter > 1) {
-                                                                serverService.updateCurrentPendingChapter(pending.chapter - 1);
+                                                                serverService.updatePendingChapter(pending, pending.chapter - 1);
                                                               }
                                                             },
                                                             child: const Icon(Icons.remove_circle_outline, size: 20, color: Colors.white70),
@@ -363,7 +363,7 @@ class _MainScreenState extends State<MainScreen> {
                                                           ),
                                                           InkWell(
                                                             onTap: () {
-                                                              serverService.updateCurrentPendingChapter(pending.chapter + 1);
+                                                              serverService.updatePendingChapter(pending, pending.chapter + 1);
                                                             },
                                                             child: const Icon(Icons.add_circle_outline, size: 20, color: Colors.white70),
                                                           ),
@@ -396,7 +396,7 @@ class _MainScreenState extends State<MainScreen> {
                                             children: [
                                               TextButton(
                                                 onPressed: () {
-                                                  serverService.dismissCurrentPending();
+                                                  serverService.dismissPending(pending);
                                                 },
                                                 child: const Text("Skip", style: TextStyle(color: Colors.white54, fontSize: 12)),
                                               ),
@@ -408,7 +408,7 @@ class _MainScreenState extends State<MainScreen> {
                                                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                                 ),
                                                 onPressed: () {
-                                                  serverService.addCurrentPendingManga(collection);
+                                                  serverService.addPendingManga(collection, pending);
                                                 },
                                                 icon: const Icon(Icons.add, size: 16),
                                                 label: const Text("Add New", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),

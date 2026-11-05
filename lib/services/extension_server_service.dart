@@ -108,9 +108,21 @@ class ExtensionServerService extends ChangeNotifier {
     });
   }
 
+  void dismissPending(PendingMangaUpdate pending) {
+    _pendingQueue.remove(pending);
+    notifyListeners();
+  }
+
   void dismissCurrentPending() {
     if (_pendingQueue.isNotEmpty) {
       _pendingQueue.removeAt(0);
+      notifyListeners();
+    }
+  }
+
+  void updatePendingChapter(PendingMangaUpdate pending, int newChapter) {
+    if (newChapter >= 1) {
+      pending.chapter = newChapter;
       notifyListeners();
     }
   }
@@ -507,10 +519,8 @@ class ExtensionServerService extends ChangeNotifier {
     } catch (_) {}
   }
 
-  Future<void> linkCurrentPendingToExisting(Manga targetManga) async {
-    if (_pendingQueue.isEmpty) return;
-
-    final PendingMangaUpdate pending = _pendingQueue.removeAt(0);
+  Future<void> linkPendingToExisting(Manga targetManga, PendingMangaUpdate pending) async {
+    _pendingQueue.remove(pending);
     notifyListeners();
 
     // Auto-add pending title as alternative title if not present
@@ -549,10 +559,14 @@ class ExtensionServerService extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> addCurrentPendingManga(MangaCollectionData collection) async {
-    if (_pendingQueue.isEmpty) return;
+  Future<void> linkCurrentPendingToExisting(Manga targetManga) async {
+    if (_pendingQueue.isNotEmpty) {
+      await linkPendingToExisting(targetManga, _pendingQueue.first);
+    }
+  }
 
-    final PendingMangaUpdate pending = _pendingQueue.removeAt(0);
+  Future<void> addPendingManga(MangaCollectionData collection, PendingMangaUpdate pending) async {
+    _pendingQueue.remove(pending);
     notifyListeners();
 
     String? coverUrl = pending.coverUrl;
@@ -605,6 +619,12 @@ class ExtensionServerService extends ChangeNotifier {
     _lastNotificationMessage = msg;
     _addLog("Manga Added", msg);
     notifyListeners();
+  }
+
+  Future<void> addCurrentPendingManga(MangaCollectionData collection) async {
+    if (_pendingQueue.isNotEmpty) {
+      await addPendingManga(collection, _pendingQueue.first);
+    }
   }
 
   Future<void> quickAddPendingManga(MangaCollectionData collection) async {
