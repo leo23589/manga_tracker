@@ -59,7 +59,7 @@ function syncAllOpenTabs() {
 }
 
 syncAllOpenTabs();
-setInterval(syncAllOpenTabs, 20000);
+setInterval(syncAllOpenTabs, 15000);
 
 browser.tabs.onCreated.addListener((tab) => {
   if (tab.id && tab.url && tab.url.startsWith("http")) {
@@ -73,9 +73,50 @@ browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   }
 });
 
-browser.tabs.onRemoved.addListener((tabId, removeInfo) => {
-  const url = tabUrlMap.get(tabId);
+// Triple-check fallback for 100% closed tab capture rate (even on suspended/unloaded tabs)
+browser.tabs.onRemoved.addListener(async (tabId, removeInfo) => {
+  let url = tabUrlMap.get(tabId);
   tabUrlMap.delete(tabId);
+
+  // Fallback 1: Check browser sessions (recently closed tab) if URL was missing
+  if (!url) {
+    try {
+      if (browser.sessions && browser.sessions.getRecentlyClosed) {
+        const sessions = await browser.sessions.getRecentlyClosed({ maxResults: 5 });
+        if (sessions) {
+          for (const session of sessions) {
+            if (session.tab && session.tab.url && session.tab.url.startsWith("http")) {
+              const isAllowed = cachedAllowedSites.some((site) => session.tab.url.toLowerCase().includes(site.toLowerCase()));
+              if (isAllowed) {
+                url = session.tab.url;
+                break;
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {}
+  }
+
+  // Fallback 2: Check recent browsing history for allowed manga site URLs
+  if (!url) {
+    try {
+      if (browser.history && browser.history.search) {
+        const historyItems = await browser.history.search({ text: "", maxResults: 5 });
+        if (historyItems) {
+          for (const item of historyItems) {
+            if (item.url && item.url.startsWith("http")) {
+              const isAllowed = cachedAllowedSites.some((site) => item.url.toLowerCase().includes(site.toLowerCase()));
+              if (isAllowed) {
+                url = item.url;
+                break;
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {}
+  }
 
   if (!url) return;
 

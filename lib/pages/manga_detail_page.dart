@@ -142,7 +142,8 @@ class _MangaDetailPageState extends State<MangaDetailPage> {
               onPressed: () {
                 final String text = altController.text.trim();
                 if (text.isNotEmpty) {
-                  manga.updateAltTitles([...manga.altTitles, text]);
+                  manga.updateAltTitles([text]);
+                  setState(() {});
                   Navigator.pop(dialogContext);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('Added alternative title "$text"'), backgroundColor: Colors.green),
@@ -181,13 +182,8 @@ class _MangaDetailPageState extends State<MangaDetailPage> {
                 subtitle: Text('Swap "${manga.title}" with "$selectedAltTitle"'),
                 onTap: () {
                   Navigator.pop(sheetContext);
-                  final String oldMainTitle = manga.title;
-                  final List<String> updatedAltList = List<String>.from(manga.altTitles)
-                    ..remove(selectedAltTitle)
-                    ..add(oldMainTitle);
-
                   manga.updateTitle(selectedAltTitle);
-                  manga.updateAltTitles(updatedAltList);
+                  setState(() {});
 
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
@@ -202,8 +198,11 @@ class _MangaDetailPageState extends State<MangaDetailPage> {
                 title: const Text("Remove Alt Title", style: TextStyle(color: Colors.redAccent)),
                 onTap: () {
                   Navigator.pop(sheetContext);
-                  final List<String> updatedAltList = List<String>.from(manga.altTitles)..remove(selectedAltTitle);
-                  manga.updateAltTitles(updatedAltList);
+                  manga.removeAltTitle(selectedAltTitle);
+                  setState(() {});
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Removed alternative title "$selectedAltTitle"')),
+                  );
                 },
               ),
             ],

@@ -263,6 +263,11 @@ class Manga extends ChangeNotifier {
     } catch (_) {}
   }
 
+  void removeAltTitle(String altToRemove) {
+    altTitles.removeWhere((t) => t.trim().toLowerCase() == altToRemove.trim().toLowerCase());
+    _touch();
+  }
+
   void updateAltTitles(List<String> newAltTitles) {
     final List<String> combined = <String>[...altTitles, ...newAltTitles];
     altTitles = _deduplicateStrings(combined, title);
