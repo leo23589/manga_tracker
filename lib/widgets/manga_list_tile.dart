@@ -37,8 +37,12 @@ class MangaListTile extends StatelessWidget {
         builder: (BuildContext context, Widget? child) {
           return Consumer<Manga>(
             builder: (BuildContext context, Manga currentManga, Widget? child) {
-              final contentTags = currentManga.themes
-                  .where((tag) => AppConstants.content.contains(tag))
+              final displayTags = currentManga.themes
+                  .where((tag) =>
+                      tag == "MangaDex" ||
+                      tag == "AniList" ||
+                      tag == "Manhwa" ||
+                      AppConstants.content.contains(tag))
                   .toList();
 
               return InkWell(
@@ -157,9 +161,9 @@ class MangaListTile extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(height: 6),
-                            if (contentTags.isNotEmpty)
+                            if (displayTags.isNotEmpty)
                               DisplayTagList(
-                                tags: contentTags,
+                                tags: displayTags,
                                 contentTagColor: Colors.red.shade900,
                                 textColor: Colors.white,
                               ),
