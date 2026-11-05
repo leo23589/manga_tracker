@@ -165,20 +165,28 @@ function processAndSendMangaData(url) {
 }
 
 /**
- * Cleans prefix site hashes while preserving numbers and ordinal numbers (13th, 3rd, 100, 1st, 2nd, etc).
+ * Cleans prefix site hashes (e.g. U23q-, K235K-, k798lLM-, 482q-, 4gp-, a12b-)
+ * while preserving real words, plain numbers (100), and ordinals (13th, 3rd, 1st).
  */
 function cleanTitleSlug(slug) {
   if (!slug) return "";
   let clean = slug.trim();
 
-  // Strip site hash prefix ONLY if it's not a real number or ordinal number (e.g. 13th, 3rd, 100)
-  // Strips "482q-", "4gp-", "a12b-"
-  // Preserves "13th-", "3rd-", "100-", "7-"
-  if (!/^[0-9]+(?:st|nd|rd|th)?[-_]/i.test(clean)) {
-    clean = clean.replace(/^[0-9]+[a-z]{1,4}[-_]/i, "");
+  const parts = clean.split(/[-_]/).filter(Boolean);
+  if (parts.length > 1) {
+    const first = parts[0];
+
+    const isOrdinal = /^[0-9]+(st|nd|rd|th)$/i.test(first);
+    const isPlainNumber = /^[0-9]+$/.test(first);
+    const isMixedCode = /^(?=[a-z0-9]*[0-9])(?=[a-z0-9]*[a-z])[a-z0-9]{2,8}$/i.test(first);
+
+    if (isMixedCode && !isOrdinal && !isPlainNumber) {
+      parts.shift();
+      clean = parts.join("-");
+    }
   }
 
-  // Strip random hash suffixes and language tags
+  // Strip random hash suffixes and language tags from the end
   clean = clean
     .replace(/-(?:eng|li|raw|sub|dub|v[0-9]+)$/gi, "")
     .replace(/-(?:[a-z0-9]{3,7})$/gi, "")
@@ -205,7 +213,7 @@ function parseMangaUrl(urlString) {
     if (pathParts.some((p) => IGNORED_PATHS.includes(p))) return null;
 
     // Pattern A: Combined title + chapter in single path segment
-    // e.g. /reader/en/482q-the-13th-hunter-chapter-7-eng-li/
+    // e.g. /reader/en/U23q-solo-leveling-chapter-7-eng-li/
     for (let i = 0; i < pathParts.length; i++) {
       const part = pathParts[i];
       if (["manga", "title", "series", "read", "reader", "en", "comic"].includes(part)) continue;
