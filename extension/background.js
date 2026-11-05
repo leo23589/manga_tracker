@@ -164,6 +164,31 @@ function processAndSendMangaData(url) {
   }
 }
 
+/**
+ * Cleans prefix site hashes while preserving numbers and ordinal numbers (13th, 3rd, 100, 1st, 2nd, etc).
+ */
+function cleanTitleSlug(slug) {
+  if (!slug) return "";
+  let clean = slug.trim();
+
+  // Strip site hash prefix ONLY if it's not a real number or ordinal number (e.g. 13th, 3rd, 100)
+  // Strips "482q-", "4gp-", "a12b-"
+  // Preserves "13th-", "3rd-", "100-", "7-"
+  if (!/^[0-9]+(?:st|nd|rd|th)?[-_]/i.test(clean)) {
+    clean = clean.replace(/^[0-9]+[a-z]{1,4}[-_]/i, "");
+  }
+
+  // Strip random hash suffixes and language tags
+  clean = clean
+    .replace(/-(?:eng|li|raw|sub|dub|v[0-9]+)$/gi, "")
+    .replace(/-(?:[a-z0-9]{3,7})$/gi, "")
+    .replace(/^(manga|read)-/i, "")
+    .replace(/-(manga|read)$/i, "")
+    .trim();
+
+  return clean;
+}
+
 function parseMangaUrl(urlString) {
   try {
     const url = new URL(urlString);
@@ -180,26 +205,14 @@ function parseMangaUrl(urlString) {
     if (pathParts.some((p) => IGNORED_PATHS.includes(p))) return null;
 
     // Pattern A: Combined title + chapter in single path segment
-    // e.g. /reader/en/482q-the-genius-knight-of-a-fallen-race-chapter-7-eng-li/
+    // e.g. /reader/en/482q-the-13th-hunter-chapter-7-eng-li/
     for (let i = 0; i < pathParts.length; i++) {
       const part = pathParts[i];
       if (["manga", "title", "series", "read", "reader", "en", "comic"].includes(part)) continue;
 
       const combinedMatch = part.match(/^(.+?)[-_]chapter[-_]([0-9]+(?:\.[0-9]+)?)(?:[-_].*)?$/i);
       if (combinedMatch) {
-        let titleSlug = combinedMatch[1];
-
-        // Strip random hash prefixes like "482q-" or "123a-"
-        titleSlug = titleSlug.replace(/^[0-9a-z]{3,6}-/i, "");
-
-        // Strip random hash suffixes and language tags
-        titleSlug = titleSlug
-          .replace(/-(?:eng|li|raw|sub|dub|v[0-9]+)$/gi, "")
-          .replace(/-(?:[a-z0-9]{3,7})$/gi, "")
-          .replace(/^(manga|read)-/i, "")
-          .replace(/-(manga|read)$/i, "")
-          .trim();
-
+        const titleSlug = cleanTitleSlug(combinedMatch[1]);
         const chapterNum = parseFloat(combinedMatch[2]);
 
         if (titleSlug && !isNaN(chapterNum) && chapterNum > 0) {
@@ -225,7 +238,7 @@ function parseMangaUrl(urlString) {
     }
 
     // Extract title slug
-    let titleSlug = "";
+    let rawTitleSlug = "";
     for (let i = 0; i < pathParts.length; i++) {
       const part = pathParts[i];
       if (["manga", "title", "series", "read", "reader", "en", "comic", "chapter", "chap", "ch"].includes(part)) continue;
@@ -233,19 +246,11 @@ function parseMangaUrl(urlString) {
       if (UUID_REGEX.test(part)) continue;
       if (!isNaN(parseFloat(part))) continue;
 
-      titleSlug = part;
+      rawTitleSlug = part;
       break;
     }
 
-    // Clean hash prefixes and suffixes
-    titleSlug = titleSlug.replace(/^[0-9a-z]{3,6}-/i, "");
-    titleSlug = titleSlug
-      .replace(/-(?:eng|li|raw|sub|dub|v[0-9]+)$/gi, "")
-      .replace(/-(?:[a-z0-9]{3,7})$/gi, "")
-      .replace(/^(manga|read)-/i, "")
-      .replace(/-(manga|read)$/i, "")
-      .trim();
-
+    const titleSlug = cleanTitleSlug(rawTitleSlug);
     if (!titleSlug || titleSlug.length < 2) return null;
 
     return {
