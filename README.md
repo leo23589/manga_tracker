@@ -10,26 +10,36 @@ A modern, fast, and feature-rich Flutter application to track your manga/manhwa 
 
 - **📖 MangaDex & 🌸 AniList Multi-Provider API Integration**:
   - Search online titles directly across [MangaDex](https://mangadex.org) and [AniList GraphQL API](https://anilist.co).
-  - Prefers official English titles while deduplicating alternative titles (`altTitles`) and tags.
-  - Distinct provider badges: **`MangaDex 🔗`** (Indigo) and **`AniList 🌸`** (Blue). A single title can be linked to both providers simultaneously!
-  - **Cover-Only Grid Picker**: Browse multi-volume cover art grids without distracting text to pick your favorite cover image.
-  - Automatically downloads cover art images locally for 100% offline access.
+  - **Strict English Title Prioritization**: Automatically filters out CJK scripts, Hangul, and Romanized Korean transliterations in favor of official English titles.
+  - **Clean Alternative Titles**: Deduplicates `altTitles` while strictly filtering for English, French, and Romaji titles.
+  - **1-Tap Title Swapping**: Swap your main title with any alternative title or add custom alt titles directly from the detail view.
+  - Distinct provider badges: **`MangaDex 🐱`** (Indigo) and **`AniList 🌸`** (Soft Blue). A single title can hold both links simultaneously!
+  - **Multi-Provider Cover Art Grid**: Browse multi-volume cover art grids from both MangaDex and AniList without distracting text.
 
 - **🦊 Firefox Extension Real-Time Sync**:
   - Firefox Mobile & Desktop WebExtension that auto-syncs read chapters when closing tabs on your favorite sites (`mangadex.org`, `manganato.com`, `mgeko.cc`, `manganami.com`, etc.).
+  - **Smart Prefix/Suffix Hash Cleaning**: Strips random site code prefixes (e.g. `482q-`, `U23q-`, `K235K-`, `k798lLM-`) and language suffixes (`-eng-li`, `-mcqyg`) while preserving ordinal numbers (`13th`, `3rd`, `100`).
   - **Smart Chapter vs Title Detection**:
     - **Chapter Links** (`/chapter-188`) ➔ Automatically updates chapter progress or prompts to add as **`Reading`**.
     - **Title Info Pages** (`/title/uuid/manga-name`) ➔ Automatically suggests adding as **`Plan to Read`**.
-  - **Near Full-Screen Queue Modal**: Stacks all closed tabs into an expandable card queue with individual `[Link to Existing]`, `[Skip]`, or `[Add New]` actions.
+  - **Near Full-Screen Queue Modal**: Stacks all closed tabs into an expandable queue with individual `[Link to Existing]`, `[Skip]`, or `[Add New]` controls.
+  - **Auto-Learns Alt Titles**: Linking a detected extension title with an existing library item automatically saves that name as a new `altTitle` for seamless future auto-matching.
 
 - **🔔 System Notifications & 30-Day Activity Logs**:
-  - Sends phone notifications when chapters update, when new suggestions are detected, or when library titles are already up to date.
+  - Sends phone notifications when chapters update, when new suggestions are detected, when library titles are already up to date, or when the Firefox extension connects/disconnects!
+  - **Heartbeat Connection Tracker**: Periodically tracks extension sync status and alerts on connection or disconnection.
   - **Activity Log Drawer 🔔**: Tap the bell icon on the Home Page to view recent sync logs with relative timestamps (*"5m ago"*, *"Yesterday"*). Logs are **automatically purged after 30 days**.
 
 - **🔍 Home Page Quick Search & Custom Filters**:
   - Search library titles and alternative titles directly from the Home Page search bar.
   - Filter chips for status (`Reading`, `Finished`, `Plan to Read`, `On Hold`, `Dropped`) and link status (`Linked 🔗` / `Not Linked 📍`).
+  - **Vibrant Manhwa Tag**: Styled with a distinct **Amber/Orange badge 🟧** (`#D97706`).
   - **Format Exclusivity**: Enforces mutual exclusivity between `Manga` and `Manhwa` content tags.
+
+- **⚡ Performance & Memory Optimizations**:
+  - `IndexedStack` + `AutomaticKeepAliveClientMixin` for instant 0ms tab switching without re-building widgets or losing scroll state.
+  - Retina 2x image memory cache downsampling (`cacheWidth`/`cacheHeight`) to prevent memory leaks and crashes.
+  - Smooth animated splash screen with percentage progress indicator (`0%` ➔ `100%`).
 
 - **📦 100% Offline & Embedded Base64 Backup**:
   - All cover art and library data are saved locally on your device disk.
@@ -38,7 +48,7 @@ A modern, fast, and feature-rich Flutter application to track your manga/manhwa 
 
 - **🎨 Midnight Dark Theme & Cat Mascot**:
   - Deep Midnight OLED dark theme (`#0F0F14`).
-  - Custom 2D calico cat mascot and startup splash screen with a percentage progress bar (`0%` ➔ `100%`).
+  - Custom 2D calico cat mascot and startup splash screen.
   - High-resolution native Android launcher icon centered with padding so no paws or tails are clipped.
 
 ---
@@ -96,7 +106,7 @@ A modern, fast, and feature-rich Flutter application to track your manga/manhwa 
 
 1. **Option A (Firefox Mobile / Desktop via AMO Self-Signing)**:
    * Upload `manga_tracker_extension.xpi` to [addons.mozilla.org/developers/addon/submit/upload-unlisted](https://addons.mozilla.org/en-US/developers/addon/submit/upload-unlisted).
-   * Mozilla signs it in ~2 mins. Tap the resulting download link in Firefox on your phone to install **permanently**!
+   * Mozilla signs it in ~1 min. Tap the resulting download link in Firefox on your phone to install **permanently**!
 
 2. **Option B (Temporary Loading)**:
    * Open Firefox ➔ `about:debugging` ➔ **Load Temporary Add-on...** ➔ Select `extension/manifest.json`.
