@@ -178,9 +178,12 @@ function cleanTitleSlug(slug) {
 
     const isOrdinal = /^[0-9]+(st|nd|rd|th)$/i.test(first);
     const isPlainNumber = /^[0-9]+$/.test(first);
-    const isMixedCode = /^(?=[a-z0-9]*[0-9])(?=[a-z0-9]*[a-z])[a-z0-9]{2,8}$/i.test(first);
+    const isCommonWord = /^(the|a|an|in|on|at|to|for|of|is|i|my|our)$/i.test(first);
 
-    if (isMixedCode && !isOrdinal && !isPlainNumber) {
+    // Aggressive check: 3 to 8 chars alphanumeric, not a common word, not a plain number
+    const isMixedCode = /^[a-z0-9]{3,8}$/i.test(first);
+
+    if (isMixedCode && !isOrdinal && !isPlainNumber && !isCommonWord) {
       parts.shift();
       clean = parts.join("-");
     }
@@ -190,8 +193,8 @@ function cleanTitleSlug(slug) {
   clean = clean
     .replace(/-(?:eng|li|raw|sub|dub|v[0-9]+)$/gi, "")
     .replace(/-(?:[a-z0-9]{3,7})$/gi, "")
-    .replace(/^(manga|read)-/i, "")
-    .replace(/-(manga|read)$/i, "")
+    .replace(/^(manga|read|comic)-/i, "")
+    .replace(/-(manga|read|comic)$/i, "")
     .trim();
 
   return clean;
@@ -213,7 +216,6 @@ function parseMangaUrl(urlString) {
     if (pathParts.some((p) => IGNORED_PATHS.includes(p))) return null;
 
     // Pattern A: Combined title + chapter in single path segment
-    // e.g. /reader/en/U23q-solo-leveling-chapter-7-eng-li/
     for (let i = 0; i < pathParts.length; i++) {
       const part = pathParts[i];
       if (["manga", "title", "series", "read", "reader", "en", "comic"].includes(part)) continue;

@@ -6,7 +6,11 @@ import 'pages/search_page.dart';
 import 'pages/splash_screen.dart';
 import 'pages/stats_page.dart';
 import 'services/extension_server_service.dart';
+import 'services/mangadex_service.dart';
+import 'services/anilist_service.dart';
 import 'widgets/manga_cover_image.dart';
+import 'widgets/dialogs/mangadex_autofill_dialog.dart';
+import 'widgets/dialogs/anilist_autofill_dialog.dart';
 
 void main() {
   runApp(const MangaApp());
@@ -178,6 +182,52 @@ class _MainScreenState extends State<MainScreen> {
             );
           },
         );
+      },
+    );
+  }
+
+  void _showMangaDexAutofillForPending(BuildContext context, ExtensionServerService serverService, PendingMangaUpdate pending) {
+    showMangaDexAutofillDialog(
+      parentContext: context,
+      initialQuery: pending.formattedTitle,
+      onSelect: (result) async {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Fetching MangaDex data...')));
+        final localPath = await MangaDexService.downloadCoverImageLocally(result.coverUrl);
+        serverService.updatePendingWithApiData(
+          pending,
+          title: result.title,
+          coverUrl: localPath ?? result.coverUrl ?? "",
+          synopsis: result.synopsis,
+          tags: [...result.tags, "MangaDex"],
+          altTitles: result.altTitles,
+          mangadexId: result.id,
+        );
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Linked pending item with MangaDex: ${result.title}'), backgroundColor: Colors.indigo));
+        }
+      },
+    );
+  }
+
+  void _showAniListAutofillForPending(BuildContext context, ExtensionServerService serverService, PendingMangaUpdate pending) {
+    showAniListAutofillDialog(
+      parentContext: context,
+      initialQuery: pending.formattedTitle,
+      onSelect: (result) async {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Fetching AniList data...')));
+        final localPath = await AniListService.downloadCoverImageLocally(result.coverUrl);
+        serverService.updatePendingWithApiData(
+          pending,
+          title: result.title,
+          coverUrl: localPath ?? result.coverUrl ?? "",
+          synopsis: result.synopsis,
+          tags: [...result.tags, "AniList"],
+          altTitles: result.altTitles,
+          anilistId: result.id,
+        );
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Linked pending item with AniList: ${result.title}'), backgroundColor: const Color(0xFF0284C7)));
+        }
       },
     );
   }
@@ -378,44 +428,50 @@ class _MainScreenState extends State<MainScreen> {
                                         ],
                                       ),
                                       const SizedBox(height: 10),
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          TextButton.icon(
-                                            style: TextButton.styleFrom(
-                                              foregroundColor: const Color(0xFF818CF8),
-                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      SingleChildScrollView(
+                                        scrollDirection: Axis.horizontal,
+                                        child: Row(
+                                          children: [
+                                            // Manual Link to Local Button
+                                            IconButton(
+                                              tooltip: "Link to Local Library",
+                                              icon: const Icon(Icons.library_books, color: Colors.indigoAccent),
+                                              onPressed: () => _showLinkToExistingDialog(context, collection, serverService, pending),
                                             ),
-                                            icon: const Icon(Icons.link, size: 16),
-                                            label: const Text("Link to Existing", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                                            onPressed: () {
-                                              _showLinkToExistingDialog(context, collection, serverService, pending);
-                                            },
-                                          ),
-                                          Row(
-                                            children: [
-                                              TextButton(
-                                                onPressed: () {
-                                                  serverService.dismissPending(pending);
-                                                },
-                                                child: const Text("Skip", style: TextStyle(color: Colors.white54, fontSize: 12)),
+                                            // Manual Link to MangaDex Button
+                                            IconButton(
+                                              tooltip: "Link with MangaDex",
+                                              icon: const Text("🐱", style: TextStyle(fontSize: 16)),
+                                              onPressed: () => _showMangaDexAutofillForPending(context, serverService, pending),
+                                            ),
+                                            // Manual Link to AniList Button
+                                            IconButton(
+                                              tooltip: "Link with AniList",
+                                              icon: const Text("🌸", style: TextStyle(fontSize: 16)),
+                                              onPressed: () => _showAniListAutofillForPending(context, serverService, pending),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            TextButton(
+                                              onPressed: () {
+                                                serverService.dismissPending(pending);
+                                              },
+                                              child: const Text("Skip", style: TextStyle(color: Colors.white54, fontSize: 12)),
+                                            ),
+                                            const SizedBox(width: 4),
+                                            ElevatedButton.icon(
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: const Color(0xFF6366F1),
+                                                foregroundColor: Colors.white,
+                                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                               ),
-                                              const SizedBox(width: 4),
-                                              ElevatedButton.icon(
-                                                style: ElevatedButton.styleFrom(
-                                                  backgroundColor: const Color(0xFF6366F1),
-                                                  foregroundColor: Colors.white,
-                                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                                ),
-                                                onPressed: () {
-                                                  serverService.addPendingManga(collection, pending);
-                                                },
-                                                icon: const Icon(Icons.add, size: 16),
-                                                label: const Text("Add New", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
+                                              onPressed: () {
+                                                serverService.addPendingManga(collection, pending);
+                                              },
+                                              icon: const Icon(Icons.add, size: 16),
+                                              label: const Text("Add New", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                            ),
+                                          ],
+                                        ),
                                       ),
                                     ],
                                   ),

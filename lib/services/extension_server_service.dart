@@ -44,6 +44,14 @@ class PendingMangaUpdate {
   final MangaStatus defaultStatus;
   final String? url;
   String? coverUrl;
+  
+  // Stored for manual linking
+  String synopsis = "";
+  List<String> themes = <String>["Manga"];
+  List<String> altTitles = <String>[];
+  String? mangadexId;
+  int? anilistId;
+  bool isManuallyLinked = false;
 
   PendingMangaUpdate({
     required this.rawTitle,
@@ -519,6 +527,27 @@ class ExtensionServerService extends ChangeNotifier {
     } catch (_) {}
   }
 
+  void updatePendingWithApiData(
+    PendingMangaUpdate pending, {
+    required String title,
+    required String coverUrl,
+    required String synopsis,
+    required List<String> tags,
+    required List<String> altTitles,
+    String? mangadexId,
+    int? anilistId,
+  }) {
+    pending.formattedTitle = title;
+    if (coverUrl.isNotEmpty) pending.coverUrl = coverUrl;
+    pending.synopsis = synopsis;
+    pending.themes = tags;
+    pending.altTitles = altTitles;
+    if (mangadexId != null) pending.mangadexId = mangadexId;
+    if (anilistId != null) pending.anilistId = anilistId;
+    pending.isManuallyLinked = true;
+    notifyListeners();
+  }
+
   Future<void> linkPendingToExisting(Manga targetManga, PendingMangaUpdate pending) async {
     _pendingQueue.remove(pending);
     notifyListeners();
@@ -559,46 +588,42 @@ class ExtensionServerService extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> linkCurrentPendingToExisting(Manga targetManga) async {
-    if (_pendingQueue.isNotEmpty) {
-      await linkPendingToExisting(targetManga, _pendingQueue.first);
-    }
-  }
-
   Future<void> addPendingManga(MangaCollectionData collection, PendingMangaUpdate pending) async {
     _pendingQueue.remove(pending);
     notifyListeners();
 
     String? coverUrl = pending.coverUrl;
-    String synopsis = "";
-    List<String> tags = <String>["Manga"];
-    String? mangadexId;
-    int? anilistId;
-    List<String> altTitlesList = <String>[];
+    String synopsis = pending.synopsis;
+    List<String> tags = pending.themes;
+    String? mangadexId = pending.mangadexId;
+    int? anilistId = pending.anilistId;
+    List<String> altTitlesList = pending.altTitles;
 
-    try {
-      final results = await MangaDexService.searchManga(pending.formattedTitle);
-      if (results.isNotEmpty) {
-        final bestMatch = results.first;
-        mangadexId = bestMatch.id;
-        coverUrl = await MangaDexService.downloadCoverImageLocally(bestMatch.coverUrl);
-        synopsis = bestMatch.synopsis;
-        tags = List<String>.from(bestMatch.tags);
-        if (!tags.contains("MangaDex")) tags.add("MangaDex");
-        altTitlesList = List<String>.from(bestMatch.altTitles);
-      } else {
-        final aniResults = await AniListService.searchManga(pending.formattedTitle);
-        if (aniResults.isNotEmpty) {
-          final bestAni = aniResults.first;
-          anilistId = bestAni.id;
-          coverUrl = await AniListService.downloadCoverImageLocally(bestAni.coverUrl);
-          synopsis = bestAni.synopsis;
-          tags = List<String>.from(bestAni.tags);
-          if (!tags.contains("AniList")) tags.add("AniList");
-          altTitlesList = List<String>.from(bestAni.altTitles);
+    if (!pending.isManuallyLinked) {
+      try {
+        final results = await MangaDexService.searchManga(pending.formattedTitle);
+        if (results.isNotEmpty) {
+          final bestMatch = results.first;
+          mangadexId = bestMatch.id;
+          coverUrl = await MangaDexService.downloadCoverImageLocally(bestMatch.coverUrl);
+          synopsis = bestMatch.synopsis;
+          tags = List<String>.from(bestMatch.tags);
+          if (!tags.contains("MangaDex")) tags.add("MangaDex");
+          altTitlesList = List<String>.from(bestMatch.altTitles);
+        } else {
+          final aniResults = await AniListService.searchManga(pending.formattedTitle);
+          if (aniResults.isNotEmpty) {
+            final bestAni = aniResults.first;
+            anilistId = bestAni.id;
+            coverUrl = await AniListService.downloadCoverImageLocally(bestAni.coverUrl);
+            synopsis = bestAni.synopsis;
+            tags = List<String>.from(bestAni.tags);
+            if (!tags.contains("AniList")) tags.add("AniList");
+            altTitlesList = List<String>.from(bestAni.altTitles);
+          }
         }
-      }
-    } catch (_) {}
+      } catch (_) {}
+    }
 
     final Manga newManga = Manga(
       title: pending.formattedTitle,
@@ -619,15 +644,5 @@ class ExtensionServerService extends ChangeNotifier {
     _lastNotificationMessage = msg;
     _addLog("Manga Added", msg);
     notifyListeners();
-  }
-
-  Future<void> addCurrentPendingManga(MangaCollectionData collection) async {
-    if (_pendingQueue.isNotEmpty) {
-      await addPendingManga(collection, _pendingQueue.first);
-    }
-  }
-
-  Future<void> quickAddPendingManga(MangaCollectionData collection) async {
-    await addCurrentPendingManga(collection);
   }
 }
