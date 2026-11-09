@@ -172,6 +172,14 @@ function cleanTitleSlug(slug) {
   if (!slug) return "";
   let clean = slug.trim();
 
+  // Strip random hash suffixes and language tags from the end FIRST
+  clean = clean
+    .replace(/-(?:eng|li|raw|sub|dub|v[0-9]+)$/gi, "")
+    .replace(/-(?:[a-z0-9]{3,7})$/gi, "")
+    .replace(/^(manga|read|comic)-/i, "")
+    .replace(/-(manga|read|comic)$/i, "")
+    .trim();
+
   const parts = clean.split(/[-_]/).filter(Boolean);
   if (parts.length > 1) {
     const first = parts[0];
@@ -180,22 +188,17 @@ function cleanTitleSlug(slug) {
     const isPlainNumber = /^[0-9]+$/.test(first);
     const isCommonWord = /^(the|a|an|in|on|at|to|for|of|is|i|my|our)$/i.test(first);
 
-    // Aggressive check: 3 to 8 chars alphanumeric, not a common word, not a plain number
-    const isMixedCode = /^[a-z0-9]{3,8}$/i.test(first);
+    // Aggressive check: 3 to 8 chars alphanumeric mixed, not a common word, not a plain number
+    const isMixedCode = /^(?=[a-z0-9]*[0-9])(?=[a-z0-9]*[a-z])[a-z0-9]{3,8}$/i.test(first);
 
-    if (isMixedCode && !isOrdinal && !isPlainNumber && !isCommonWord) {
+    // If it's a completely generic random letter sequence that shouldn't start a sentence (like "mcqyg")
+    const isRandomGibberish = /^[a-z]{4,6}$/i.test(first) && !isCommonWord && !/^(solo|return|hero|tower|player|rank|god|king|demon|magic|sword)$/i.test(first);
+
+    if ((isMixedCode || isRandomGibberish) && !isOrdinal && !isPlainNumber && !isCommonWord) {
       parts.shift();
       clean = parts.join("-");
     }
   }
-
-  // Strip random hash suffixes and language tags from the end
-  clean = clean
-    .replace(/-(?:eng|li|raw|sub|dub|v[0-9]+)$/gi, "")
-    .replace(/-(?:[a-z0-9]{3,7})$/gi, "")
-    .replace(/^(manga|read|comic)-/i, "")
-    .replace(/-(manga|read|comic)$/i, "")
-    .trim();
 
   return clean;
 }
@@ -216,6 +219,7 @@ function parseMangaUrl(urlString) {
     if (pathParts.some((p) => IGNORED_PATHS.includes(p))) return null;
 
     // Pattern A: Combined title + chapter in single path segment
+    // e.g. /reader/en/reincarnators-stream-chapter-71-eng-li/
     for (let i = 0; i < pathParts.length; i++) {
       const part = pathParts[i];
       if (["manga", "title", "series", "read", "reader", "en", "comic"].includes(part)) continue;
