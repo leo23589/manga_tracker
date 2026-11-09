@@ -45,44 +45,51 @@ sendHeartbeatPing();
 // Cache of tab ID -> last visited URL
 const tabUrlMap = new Map();
 
-// Pre-populate tabUrlMap with ALL open tabs (including background/unloaded tabs)
+// FORCE-sync all tabs aggressively every 5 seconds
 function syncAllOpenTabs() {
-  browser.tabs.query({}).then((tabs) => {
-    if (tabs) {
-      tabs.forEach((tab) => {
-        if (tab.id && tab.url && tab.url.startsWith("http")) {
-          tabUrlMap.set(tab.id, tab.url);
-        }
-      });
-    }
-  }).catch(() => {});
+  if (browser.tabs && browser.tabs.query) {
+    browser.tabs.query({}).then((tabs) => {
+      if (tabs) {
+        tabs.forEach((tab) => {
+          // Even if tab is 'unloaded', tab.url is usually available in the WebExtension API.
+          if (tab.id && tab.url && tab.url.startsWith("http")) {
+            tabUrlMap.set(tab.id, tab.url);
+          }
+        });
+      }
+    }).catch(() => {});
+  }
 }
 
 syncAllOpenTabs();
-setInterval(syncAllOpenTabs, 15000);
+setInterval(syncAllOpenTabs, 5000);
 
+// Watch for any created tab and immediately grab its pending or committed URL
 browser.tabs.onCreated.addListener((tab) => {
-  if (tab.id && tab.url && tab.url.startsWith("http")) {
-    tabUrlMap.set(tab.id, tab.url);
+  const url = tab.url || tab.pendingUrl;
+  if (tab.id && url && url.startsWith("http")) {
+    tabUrlMap.set(tab.id, url);
   }
 });
 
+// Update map continuously as tabs navigate
 browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (tab.url && tab.url.startsWith("http")) {
-    tabUrlMap.set(tabId, tab.url);
+  const url = changeInfo.url || tab.url || tab.pendingUrl;
+  if (url && url.startsWith("http")) {
+    tabUrlMap.set(tabId, url);
   }
 });
 
-// Triple-check fallback for 100% closed tab capture rate (even on suspended/unloaded tabs)
+// TRIPLE-CHECK fallback when tab is closed
 browser.tabs.onRemoved.addListener(async (tabId, removeInfo) => {
   let url = tabUrlMap.get(tabId);
   tabUrlMap.delete(tabId);
 
-  // Fallback 1: Check browser sessions (recently closed tab) if URL was missing
+  // Fallback 1: Query the recently closed sessions API (Native Firefox restore history)
   if (!url) {
     try {
       if (browser.sessions && browser.sessions.getRecentlyClosed) {
-        const sessions = await browser.sessions.getRecentlyClosed({ maxResults: 5 });
+        const sessions = await browser.sessions.getRecentlyClosed({ maxResults: 10 });
         if (sessions) {
           for (const session of sessions) {
             if (session.tab && session.tab.url && session.tab.url.startsWith("http")) {
@@ -98,11 +105,11 @@ browser.tabs.onRemoved.addListener(async (tabId, removeInfo) => {
     } catch (e) {}
   }
 
-  // Fallback 2: Check recent browsing history for allowed manga site URLs
+  // Fallback 2: Query the native history API for the most recent page visited
   if (!url) {
     try {
       if (browser.history && browser.history.search) {
-        const historyItems = await browser.history.search({ text: "", maxResults: 5 });
+        const historyItems = await browser.history.search({ text: "", maxResults: 10 });
         if (historyItems) {
           for (const item of historyItems) {
             if (item.url && item.url.startsWith("http")) {
@@ -188,7 +195,7 @@ function cleanTitleSlug(slug) {
     const isPlainNumber = /^[0-9]+$/.test(first);
     const isCommonWord = /^(the|a|an|in|on|at|to|for|of|is|i|my|our)$/i.test(first);
 
-    // Aggressive check: 3 to 8 chars alphanumeric mixed, not a common word, not a plain number
+    // Strict check: Must contain at least one number AND at least one letter
     const isMixedCode = /^(?=[a-z0-9]*[0-9])(?=[a-z0-9]*[a-z])[a-z0-9]{3,8}$/i.test(first);
 
     // If it's a completely generic random letter sequence that shouldn't start a sentence (like "mcqyg")
@@ -219,7 +226,6 @@ function parseMangaUrl(urlString) {
     if (pathParts.some((p) => IGNORED_PATHS.includes(p))) return null;
 
     // Pattern A: Combined title + chapter in single path segment
-    // e.g. /reader/en/reincarnators-stream-chapter-71-eng-li/
     for (let i = 0; i < pathParts.length; i++) {
       const part = pathParts[i];
       if (["manga", "title", "series", "read", "reader", "en", "comic"].includes(part)) continue;
