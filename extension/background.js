@@ -51,7 +51,6 @@ function syncAllOpenTabs() {
     browser.tabs.query({}).then((tabs) => {
       if (tabs) {
         tabs.forEach((tab) => {
-          // Even if tab is 'unloaded', tab.url is usually available in the WebExtension API.
           if (tab.id && tab.url && tab.url.startsWith("http")) {
             tabUrlMap.set(tab.id, tab.url);
           }
@@ -85,7 +84,6 @@ browser.tabs.onRemoved.addListener(async (tabId, removeInfo) => {
   let url = tabUrlMap.get(tabId);
   tabUrlMap.delete(tabId);
 
-  // Fallback 1: Query the recently closed sessions API (Native Firefox restore history)
   if (!url) {
     try {
       if (browser.sessions && browser.sessions.getRecentlyClosed) {
@@ -105,7 +103,6 @@ browser.tabs.onRemoved.addListener(async (tabId, removeInfo) => {
     } catch (e) {}
   }
 
-  // Fallback 2: Query the native history API for the most recent page visited
   if (!url) {
     try {
       if (browser.history && browser.history.search) {
@@ -134,9 +131,6 @@ browser.tabs.onRemoved.addListener(async (tabId, removeInfo) => {
   }
 });
 
-/**
- * Parses manga URL and sends instant HTTP POST update to app server.
- */
 function processAndSendMangaData(url) {
   try {
     const parsed = parseMangaUrl(url);
@@ -195,17 +189,21 @@ function cleanTitleSlug(slug) {
     const isPlainNumber = /^[0-9]+$/.test(first);
     const isCommonWord = /^(the|a|an|in|on|at|to|for|of|is|i|my|our)$/i.test(first);
 
-    // Strict check: Must contain at least one number AND at least one letter
+    // Strict check for prefix hashes: must contain at least one number AND at least one letter, exactly 3-8 chars.
+    // If it's longer than 8 characters (e.g. "reincarnators"), it's definitely a real word and NOT a prefix hash!
     const isMixedCode = /^(?=[a-z0-9]*[0-9])(?=[a-z0-9]*[a-z])[a-z0-9]{3,8}$/i.test(first);
 
-    // If it's a completely generic random letter sequence that shouldn't start a sentence (like "mcqyg")
-    const isRandomGibberish = /^[a-z]{4,6}$/i.test(first) && !isCommonWord && !/^(solo|return|hero|tower|player|rank|god|king|demon|magic|sword)$/i.test(first);
+    // Completely generic random letter sequence that shouldn't start a sentence (like "mcqyg")
+    const isRandomGibberish = /^[a-z]{4,6}$/i.test(first) && !isCommonWord && !/^(solo|return|hero|tower|player|rank|god|king|demon|magic|sword|reincarnators?)$/i.test(first);
 
     if ((isMixedCode || isRandomGibberish) && !isOrdinal && !isPlainNumber && !isCommonWord) {
       parts.shift();
       clean = parts.join("-");
     }
   }
+
+  // Restore 's suffix which may have been split by regex dashes
+  clean = clean.replace(/-s\b/g, "'s");
 
   return clean;
 }
@@ -226,6 +224,7 @@ function parseMangaUrl(urlString) {
     if (pathParts.some((p) => IGNORED_PATHS.includes(p))) return null;
 
     // Pattern A: Combined title + chapter in single path segment
+    // e.g. /reader/en/reincarnators-stream-chapter-71-eng-li/
     for (let i = 0; i < pathParts.length; i++) {
       const part = pathParts[i];
       if (["manga", "title", "series", "read", "reader", "en", "comic"].includes(part)) continue;
