@@ -42,20 +42,53 @@ function sendHeartbeatPing() {
 setInterval(sendHeartbeatPing, 15000);
 sendHeartbeatPing();
 
-// Cache of tab ID -> last visited URL
-const tabUrlMap = new Map();
+// ==============================================================
+// PERSISTENT TAB STORAGE (Fix for Android killing RAM in background)
+// ==============================================================
 
-// FORCE-sync all tabs aggressively every 5 seconds
+async function saveTabUrl(tabId, url) {
+  if (!tabId || !url || !url.startsWith("http")) return;
+  try {
+    const res = await browser.storage.local.get({ tabCache: {} });
+    const cache = res.tabCache;
+    cache[tabId] = url;
+    await browser.storage.local.set({ tabCache: cache });
+  } catch (e) {}
+}
+
+async function popTabUrl(tabId) {
+  try {
+    const res = await browser.storage.local.get({ tabCache: {} });
+    const url = res.tabCache[tabId];
+    if (url) {
+      delete res.tabCache[tabId];
+      await browser.storage.local.set({ tabCache: res.tabCache });
+    }
+    return url;
+  } catch (e) {
+    return null;
+  }
+}
+
+// FORCE-sync all tabs aggressively to persistent storage
 function syncAllOpenTabs() {
   if (browser.tabs && browser.tabs.query) {
-    browser.tabs.query({}).then((tabs) => {
-      if (tabs) {
+    browser.tabs.query({}).then(async (tabs) => {
+      if (!tabs) return;
+      try {
+        const res = await browser.storage.local.get({ tabCache: {} });
+        let updated = false;
         tabs.forEach((tab) => {
-          if (tab.id && tab.url && tab.url.startsWith("http")) {
-            tabUrlMap.set(tab.id, tab.url);
+          const url = tab.url || tab.pendingUrl;
+          if (tab.id && url && url.startsWith("http") && res.tabCache[tab.id] !== url) {
+            res.tabCache[tab.id] = url;
+            updated = true;
           }
         });
-      }
+        if (updated) {
+          await browser.storage.local.set({ tabCache: res.tabCache });
+        }
+      } catch(e) {}
     }).catch(() => {});
   }
 }
@@ -66,24 +99,27 @@ setInterval(syncAllOpenTabs, 5000);
 // Watch for any created tab and immediately grab its pending or committed URL
 browser.tabs.onCreated.addListener((tab) => {
   const url = tab.url || tab.pendingUrl;
-  if (tab.id && url && url.startsWith("http")) {
-    tabUrlMap.set(tab.id, url);
-  }
+  saveTabUrl(tab.id, url);
 });
 
 // Update map continuously as tabs navigate
 browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   const url = changeInfo.url || tab.url || tab.pendingUrl;
-  if (url && url.startsWith("http")) {
-    tabUrlMap.set(tabId, url);
-  }
+  saveTabUrl(tabId, url);
 });
 
 // TRIPLE-CHECK fallback when tab is closed
 browser.tabs.onRemoved.addListener(async (tabId, removeInfo) => {
-  let url = tabUrlMap.get(tabId);
-  tabUrlMap.delete(tabId);
+  // Read from the physical persistent cache (Survives Android RAM wipe!)
+  let url = await popTabUrl(tabId);
 
+  // If memory was wiped, reload allowed sites list just in case
+  if (cachedAllowedSites.length === 0) {
+    const res = await browser.storage.local.get({ allowedSites: DEFAULT_SITES });
+    cachedAllowedSites = res.allowedSites || DEFAULT_SITES;
+  }
+
+  // Fallback 1: Query the recently closed sessions API
   if (!url) {
     try {
       if (browser.sessions && browser.sessions.getRecentlyClosed) {
@@ -103,6 +139,7 @@ browser.tabs.onRemoved.addListener(async (tabId, removeInfo) => {
     } catch (e) {}
   }
 
+  // Fallback 2: Query the native history API
   if (!url) {
     try {
       if (browser.history && browser.history.search) {
@@ -134,35 +171,19 @@ browser.tabs.onRemoved.addListener(async (tabId, removeInfo) => {
 function processAndSendMangaData(url) {
   try {
     const parsed = parseMangaUrl(url);
-    if (!parsed || !parsed.title) {
-      console.log("Manga Tracker Sync: Ignored non-manga URL:", url);
-      return;
-    }
-
-    console.log("Manga Tracker Sync: Sending instant update to app:", parsed);
+    if (!parsed || !parsed.title) return;
 
     fetch("http://127.0.0.1:8080/update", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         title: parsed.title,
         chapter: parsed.chapter,
         isChapter: parsed.isChapter,
         url: url
       })
-    })
-    .then((res) => res.json())
-    .then((data) => {
-      console.log("Manga Tracker Sync Response:", data);
-    })
-    .catch((err) => {
-      console.warn("Manga Tracker Sync: Could not reach app server at http://127.0.0.1:8080 -", err);
-    });
-  } catch (e) {
-    console.error("Manga Tracker Sync error:", e);
-  }
+    }).catch((err) => {});
+  } catch (e) {}
 }
 
 /**
@@ -189,11 +210,10 @@ function cleanTitleSlug(slug) {
     const isPlainNumber = /^[0-9]+$/.test(first);
     const isCommonWord = /^(the|a|an|in|on|at|to|for|of|is|i|my|our)$/i.test(first);
 
-    // Strict check for prefix hashes: must contain at least one number AND at least one letter, exactly 3-8 chars.
-    // If it's longer than 8 characters (e.g. "reincarnators"), it's definitely a real word and NOT a prefix hash!
+    // Strict check for prefix hashes: must contain at least one number AND at least one letter
     const isMixedCode = /^(?=[a-z0-9]*[0-9])(?=[a-z0-9]*[a-z])[a-z0-9]{3,8}$/i.test(first);
 
-    // Completely generic random letter sequence that shouldn't start a sentence (like "mcqyg")
+    // Completely generic random letter sequence that shouldn't start a sentence
     const isRandomGibberish = /^[a-z]{4,6}$/i.test(first) && !isCommonWord && !/^(solo|return|hero|tower|player|rank|god|king|demon|magic|sword|reincarnators?)$/i.test(first);
 
     if ((isMixedCode || isRandomGibberish) && !isOrdinal && !isPlainNumber && !isCommonWord) {
@@ -224,7 +244,6 @@ function parseMangaUrl(urlString) {
     if (pathParts.some((p) => IGNORED_PATHS.includes(p))) return null;
 
     // Pattern A: Combined title + chapter in single path segment
-    // e.g. /reader/en/reincarnators-stream-chapter-71-eng-li/
     for (let i = 0; i < pathParts.length; i++) {
       const part = pathParts[i];
       if (["manga", "title", "series", "read", "reader", "en", "comic"].includes(part)) continue;
