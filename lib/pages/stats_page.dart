@@ -5,6 +5,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/manga.dart';
+import '../services/extension_server_service.dart';
 
 class StatsPage extends StatelessWidget {
   const StatsPage({super.key});
@@ -59,6 +60,7 @@ class StatsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final MangaCollectionData mangaCollection = context.watch<MangaCollectionData>();
+    final ExtensionServerService serverService = context.watch<ExtensionServerService>();
     final List<Manga> mangas = mangaCollection.mangas;
 
     final int totalMangas = mangas.length;
@@ -84,7 +86,7 @@ class StatsPage extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Statistics & Backup"),
+        title: const Text("Settings & Stats"),
         backgroundColor: Theme.of(context).colorScheme.primaryContainer,
       ),
       body: SingleChildScrollView(
@@ -92,6 +94,66 @@ class StatsPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
+            // Extension Sync Section
+            const Text("Extension Sync", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A1A24),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: serverService.isListening ? Colors.green.withAlpha((255 * 0.3).round()) : Colors.red.withAlpha((255 * 0.3).round()),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        serverService.isListening ? Icons.sensors : Icons.sensors_off,
+                        color: serverService.isListening ? Colors.green : Colors.redAccent,
+                      ),
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            serverService.isListening ? "Sync Server is Running" : "Sync Server is Stopped",
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          ),
+                          Text(
+                            serverService.isExtensionConnected
+                                ? "Firefox extension is connected"
+                                : "Waiting for Firefox extension...",
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: serverService.isListening ? Colors.white70 : Colors.white38,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  Switch(
+                    value: serverService.isListening,
+                    activeColor: Colors.green,
+                    onChanged: (bool value) {
+                      if (value) {
+                        serverService.startServer(mangaCollection);
+                      } else {
+                        serverService.stopServer();
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 28),
+
+            // Backup Section
             const Text("Backup & Restore", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
             Row(
