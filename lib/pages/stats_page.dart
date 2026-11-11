@@ -139,7 +139,7 @@ class StatsPage extends StatelessWidget {
                   ),
                   Switch(
                     value: serverService.isListening,
-                    activeColor: Colors.green,
+                    activeThumbColor: Colors.green,
                     onChanged: (bool value) {
                       if (value) {
                         serverService.startServer(mangaCollection);
