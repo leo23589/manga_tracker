@@ -348,28 +348,32 @@ class ExtensionServerService extends ChangeNotifier {
         matchedManga = m;
         break;
       }
+      
+      // Strict matching for titles and altTitles (Exact Match)
+      if (normalizeTitle(m.title) == normIncoming) {
+        matchedManga = m;
+        break;
+      }
+
+      if (m.altTitles.any((alt) => normalizeTitle(alt) == normIncoming)) {
+        matchedManga = m;
+        break;
+      }
+      
+      // URL host matching logic
       if (url != null && url.isNotEmpty) {
         try {
           final String host = Uri.parse(url).host.toLowerCase();
-          if (m.sourceUrls.any((s) => s.toLowerCase().contains(host) && normalizeTitle(s).contains(normIncoming))) {
-            matchedManga = m;
-            break;
+          if (m.sourceUrls.any((s) => s.toLowerCase().contains(host))) {
+             // Strict URL matching check
+             // Only auto-link by URL host if we have a robust partial match of the specific title string
+             if (m.sourceUrls.any((s) => s.toLowerCase() == url.toLowerCase() || 
+                (normalizeTitle(s).contains(normIncoming) && normIncoming.length > 5))) {
+               matchedManga = m;
+               break;
+             }
           }
         } catch (_) {}
-      }
-
-      final String normLocal = normalizeTitle(m.title);
-      if (normLocal == normIncoming || normLocal.contains(normIncoming) || normIncoming.contains(normLocal)) {
-        matchedManga = m;
-        break;
-      }
-
-      if (m.altTitles.any((alt) {
-        final String normAlt = normalizeTitle(alt);
-        return normAlt == normIncoming || normAlt.contains(normIncoming) || normIncoming.contains(normAlt);
-      })) {
-        matchedManga = m;
-        break;
       }
     }
 
@@ -386,17 +390,13 @@ class ExtensionServerService extends ChangeNotifier {
               matchedManga = m;
               break;
             }
-            final String normLocal = normalizeTitle(m.title);
-            if (normLocal == normOfficial || normLocal.contains(normOfficial) || normOfficial.contains(normLocal)) {
+            if (normalizeTitle(m.title) == normOfficial) {
               matchedManga = m;
               m.updateMangaDexId(bestMatch.id);
               m.updateAltTitles(bestMatch.altTitles);
               break;
             }
-            if (m.altTitles.any((alt) {
-              final String normAlt = normalizeTitle(alt);
-              return normAlt == normOfficial || normAlt.contains(normOfficial) || normOfficial.contains(normAlt);
-            })) {
+            if (m.altTitles.any((alt) => normalizeTitle(alt) == normOfficial)) {
               matchedManga = m;
               m.updateMangaDexId(bestMatch.id);
               m.updateAltTitles(bestMatch.altTitles);
@@ -419,8 +419,7 @@ class ExtensionServerService extends ChangeNotifier {
               matchedManga = m;
               break;
             }
-            final String normLocal = normalizeTitle(m.title);
-            if (normLocal == normAni || normLocal.contains(normAni) || normAni.contains(normLocal)) {
+            if (normalizeTitle(m.title) == normAni) {
               matchedManga = m;
               m.updateAniListId(bestAni.id);
               m.updateAltTitles([...m.altTitles, ...bestAni.altTitles]);
