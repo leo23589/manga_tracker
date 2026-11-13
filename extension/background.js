@@ -42,33 +42,8 @@ function sendHeartbeatPing() {
 setInterval(sendHeartbeatPing, 15000);
 sendHeartbeatPing();
 
-// ==============================================================
-// PERSISTENT TAB STORAGE (Fix for Android killing RAM in background)
-// ==============================================================
-
-async function saveTabUrl(tabId, url) {
-  if (!tabId || !url || !url.startsWith("http")) return;
-  try {
-    const res = await browser.storage.local.get({ tabCache: {} });
-    const cache = res.tabCache;
-    cache[tabId] = url;
-    await browser.storage.local.set({ tabCache: cache });
-  } catch (e) {}
-}
-
-async function popTabUrl(tabId) {
-  try {
-    const res = await browser.storage.local.get({ tabCache: {} });
-    const url = res.tabCache[tabId];
-    if (url) {
-      delete res.tabCache[tabId];
-      await browser.storage.local.set({ tabCache: res.tabCache });
-    }
-    return url;
-  } catch (e) {
-    return null;
-  }
-}
+// Cache of tab ID -> last visited URL
+const tabUrlMap = new Map();
 
 // FORCE-sync all tabs aggressively to persistent storage
 function syncAllOpenTabs() {
@@ -108,16 +83,34 @@ browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   saveTabUrl(tabId, url);
 });
 
+async function saveTabUrl(tabId, url) {
+  if (!tabId || !url || !url.startsWith("http")) return;
+  try {
+    const res = await browser.storage.local.get({ tabCache: {} });
+    const cache = res.tabCache;
+    cache[tabId] = url;
+    await browser.storage.local.set({ tabCache: cache });
+  } catch (e) {}
+}
+
+async function popTabUrl(tabId) {
+  try {
+    const res = await browser.storage.local.get({ tabCache: {} });
+    const url = res.tabCache[tabId];
+    if (url) {
+      delete res.tabCache[tabId];
+      await browser.storage.local.set({ tabCache: res.tabCache });
+    }
+    return url;
+  } catch (e) {
+    return null;
+  }
+}
+
 // TRIPLE-CHECK fallback when tab is closed
 browser.tabs.onRemoved.addListener(async (tabId, removeInfo) => {
-  // Read from the physical persistent cache (Survives Android RAM wipe!)
+  // Read from the physical persistent cache
   let url = await popTabUrl(tabId);
-
-  // If memory was wiped, reload allowed sites list just in case
-  if (cachedAllowedSites.length === 0) {
-    const res = await browser.storage.local.get({ allowedSites: DEFAULT_SITES });
-    cachedAllowedSites = res.allowedSites || DEFAULT_SITES;
-  }
 
   // Fallback 1: Query the recently closed sessions API
   if (!url) {
@@ -187,22 +180,19 @@ function processAndSendMangaData(url) {
 }
 
 /**
- * Cleans prefix site hashes (e.g. U23q-, K235K-, k798lLM-, 482q-, 4gp-, a12b-)
- * while preserving real words, plain numbers (100), and ordinals (13th, 3rd, 1st).
+ * Cleans prefix site hashes (e.g. U23q-, K235K-, k798lLM-, 482q-, 4gp-)
+ * while preserving real words, plain numbers, and ordinals.
  */
 function cleanTitleSlug(slug) {
   if (!slug) return "";
   let clean = slug.trim();
 
-  // Strip random hash suffixes and language tags from the end FIRST
-  clean = clean
-    .replace(/-(?:eng|li|raw|sub|dub|v[0-9]+)$/gi, "")
-    .replace(/-(?:[a-z0-9]{3,7})$/gi, "")
-    .replace(/^(manga|read|comic)-/i, "")
-    .replace(/-(manga|read|comic)$/i, "")
-    .trim();
+  // 1. Remove ONLY exact known language/release tags from the end
+  // We DO NOT use generic [a-z0-9] anymore as it destroyed words like "stream"
+  clean = clean.replace(/(?:[-_](?:eng|li|raw|sub|dub|v[0-9]+|chapter|chap|ch|comic|manga|read))+$/gi, "");
 
-  const parts = clean.split(/[-_]/).filter(Boolean);
+  let parts = clean.split(/[-_]/).filter(Boolean);
+
   if (parts.length > 1) {
     const first = parts[0];
 
@@ -212,18 +202,29 @@ function cleanTitleSlug(slug) {
 
     // Strict check for prefix hashes: must contain at least one number AND at least one letter
     const isMixedCode = /^(?=[a-z0-9]*[0-9])(?=[a-z0-9]*[a-z])[a-z0-9]{3,8}$/i.test(first);
-
     // Completely generic random letter sequence that shouldn't start a sentence
     const isRandomGibberish = /^[a-z]{4,6}$/i.test(first) && !isCommonWord && !/^(solo|return|hero|tower|player|rank|god|king|demon|magic|sword|reincarnators?)$/i.test(first);
 
     if ((isMixedCode || isRandomGibberish) && !isOrdinal && !isPlainNumber && !isCommonWord) {
       parts.shift();
-      clean = parts.join("-");
     }
   }
 
-  // Restore 's suffix which may have been split by regex dashes
-  clean = clean.replace(/-s\b/g, "'s");
+  // Check the last part to strip trailing hashes (e.g. -a1b2c) safely
+  if (parts.length > 1) {
+    const last = parts[parts.length - 1];
+    const isLastMixedCode = /^(?=[a-z0-9]*[0-9])(?=[a-z0-9]*[a-z])[a-z0-9]{3,8}$/i.test(last);
+    if (isLastMixedCode) {
+      parts.pop();
+    }
+  }
+
+  if (parts.length > 0) {
+    clean = parts.join("-");
+  }
+
+  // Convert "-s-" or "-s$" to "'s"
+  clean = clean.replace(/-s(\b|-)/g, "'s$1");
 
   return clean;
 }

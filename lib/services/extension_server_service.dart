@@ -360,18 +360,16 @@ class ExtensionServerService extends ChangeNotifier {
         break;
       }
       
-      // URL host matching logic
+      // URL exact match logic (safeguard against fuzzy matching wrong manga)
       if (url != null && url.isNotEmpty) {
         try {
-          final String host = Uri.parse(url).host.toLowerCase();
-          if (m.sourceUrls.any((s) => s.toLowerCase().contains(host))) {
-             // Strict URL matching check
-             // Only auto-link by URL host if we have a robust partial match of the specific title string
-             if (m.sourceUrls.any((s) => s.toLowerCase() == url.toLowerCase() || 
-                (normalizeTitle(s).contains(normIncoming) && normIncoming.length > 5))) {
-               matchedManga = m;
-               break;
-             }
+          final String cleanUrl = url.trim().toLowerCase().split('?').first.split('#').first;
+          if (m.sourceUrls.any((s) {
+            final String cleanSavedUrl = s.trim().toLowerCase().split('?').first.split('#').first;
+            return cleanSavedUrl == cleanUrl;
+          })) {
+             matchedManga = m;
+             break;
           }
         } catch (_) {}
       }
@@ -643,5 +641,11 @@ class ExtensionServerService extends ChangeNotifier {
     _lastNotificationMessage = msg;
     _addLog("Manga Added", msg);
     notifyListeners();
+  }
+
+  Future<void> quickAddPendingManga(MangaCollectionData collection) async {
+    if (_pendingQueue.isNotEmpty) {
+      await addPendingManga(collection, _pendingQueue.first);
+    }
   }
 }
