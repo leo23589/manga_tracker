@@ -76,7 +76,7 @@ class Manga extends ChangeNotifier {
     DateTime? lastUpdated,
   })  : themes = _sortTags(themes, mangadexId, anilistId),
         altTitles = _deduplicateStrings(altTitles ?? <String>[], title),
-        sourceUrls = sourceUrls ?? <String>[],
+        sourceUrls = _deduplicateUrls(sourceUrls ?? <String>[]),
         createdAt = createdAt ?? DateTime.now(),
         lastUpdated = lastUpdated ?? createdAt ?? DateTime.now();
 
@@ -106,6 +106,22 @@ class Manga extends ChangeNotifier {
       }
     }
     return unique.toList();
+  }
+
+  static List<String> _deduplicateUrls(List<String> urls) {
+    final Map<String, String> hostToUrl = <String, String>{};
+    for (final String url in urls) {
+      final String cleanUrl = url.trim();
+      if (cleanUrl.isEmpty) continue;
+      try {
+        final Uri uri = Uri.parse(cleanUrl);
+        String host = uri.host.toLowerCase();
+        if (host.startsWith('www.')) host = host.substring(4);
+        // Save the most recent/relevant url for this host
+        hostToUrl[host] = cleanUrl;
+      } catch (_) {}
+    }
+    return hostToUrl.values.toList();
   }
 
   static List<String> _sortTags(List<String> tagsInput, String? mId, int? aId) {
@@ -254,13 +270,28 @@ class Manga extends ChangeNotifier {
     if (url == null || url.trim().isEmpty) return;
     try {
       final String cleanUrl = url.trim();
-      final Uri uri = Uri.parse(cleanUrl);
-      final String host = uri.host.toLowerCase();
-      if (!sourceUrls.any((s) => s.toLowerCase().contains(host))) {
-        sourceUrls.add(cleanUrl);
-        _touch();
-      }
+      final Uri newUri = Uri.parse(cleanUrl);
+      String newHost = newUri.host.toLowerCase();
+      if (newHost.startsWith('www.')) newHost = newHost.substring(4);
+      
+      // Remove any existing URL from the same host, then add the new one
+      sourceUrls.removeWhere((s) {
+        try {
+          String sHost = Uri.parse(s).host.toLowerCase();
+          if (sHost.startsWith('www.')) sHost = sHost.substring(4);
+          return sHost == newHost;
+        } catch (_) {
+          return false;
+        }
+      });
+      sourceUrls.add(cleanUrl);
+      _touch();
     } catch (_) {}
+  }
+
+  void removeSourceUrl(String urlToRemove) {
+    sourceUrls.removeWhere((u) => u.trim() == urlToRemove.trim());
+    _touch();
   }
 
   void removeAltTitle(String altToRemove) {

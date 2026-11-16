@@ -158,6 +158,47 @@ class _MangaDetailPageState extends State<MangaDetailPage> {
     );
   }
 
+  void _showAddSourceUrlDialog(Manga manga) {
+    final TextEditingController urlController = TextEditingController();
+
+    showDialog<void>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text("Add Direct Source URL"),
+          content: TextField(
+            controller: urlController,
+            autofocus: true,
+            decoration: const InputDecoration(
+              hintText: "e.g. https://www.mgeko.cc/manga/...",
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final String text = urlController.text.trim();
+                if (text.isNotEmpty) {
+                  manga.addSourceUrl(text);
+                  setState(() {});
+                  Navigator.pop(dialogContext);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Source URL added!'), backgroundColor: Colors.green),
+                  );
+                }
+              },
+              child: const Text("Add URL"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   void _showAltTitleActionSheet(Manga manga, String selectedAltTitle) {
     showModalBottomSheet<void>(
       context: context,
@@ -182,8 +223,13 @@ class _MangaDetailPageState extends State<MangaDetailPage> {
                 subtitle: Text('Swap "${manga.title}" with "$selectedAltTitle"'),
                 onTap: () {
                   Navigator.pop(sheetContext);
+                  final String oldMainTitle = manga.title;
+                  final List<String> updatedAltList = List<String>.from(manga.altTitles)
+                    ..remove(selectedAltTitle)
+                    ..add(oldMainTitle);
+
                   manga.updateTitle(selectedAltTitle);
-                  setState(() {});
+                  manga.updateAltTitles(updatedAltList);
 
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
@@ -198,10 +244,44 @@ class _MangaDetailPageState extends State<MangaDetailPage> {
                 title: const Text("Remove Alt Title", style: TextStyle(color: Colors.redAccent)),
                 onTap: () {
                   Navigator.pop(sheetContext);
-                  manga.removeAltTitle(selectedAltTitle);
+                  final List<String> updatedAltList = List<String>.from(manga.altTitles)..remove(selectedAltTitle);
+                  manga.updateAltTitles(updatedAltList);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showSourceUrlActionSheet(Manga manga, String selectedUrl) {
+    showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext sheetContext) {
+        return Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                selectedUrl,
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white70),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                title: const Text("Remove Source URL", style: TextStyle(color: Colors.redAccent)),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  manga.removeSourceUrl(selectedUrl);
                   setState(() {});
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Removed alternative title "$selectedAltTitle"')),
+                    const SnackBar(content: Text('Source URL removed')),
                   );
                 },
               ),
@@ -317,6 +397,16 @@ class _MangaDetailPageState extends State<MangaDetailPage> {
       _temporarySelectedThemes = List<String>.from(widget.manga.themes);
       _temporaryImagePath = widget.manga.imagePath;
     });
+  }
+
+  String _getHostName(String url) {
+    try {
+      String host = Uri.parse(url).host.toLowerCase();
+      if (host.startsWith('www.')) host = host.substring(4);
+      return host;
+    } catch (_) {
+      return url;
+    }
   }
 
   @override
@@ -470,6 +560,61 @@ class _MangaDetailPageState extends State<MangaDetailPage> {
                                 Icon(Icons.add, size: 12, color: Colors.indigoAccent),
                                 SizedBox(width: 4),
                                 Text("Add Alt Title", style: TextStyle(fontSize: 11, color: Colors.indigoAccent, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Center(
+                    child: Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: 6.0,
+                      runSpacing: 6.0,
+                      children: [
+                        ...manga.sourceUrls.map((url) {
+                          return InkWell(
+                            onTap: () => _showSourceUrlActionSheet(manga, url),
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF161622),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.grey.shade700),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.public, size: 12, color: Colors.grey),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    _getHostName(url),
+                                    style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }),
+                        InkWell(
+                          onTap: () => _showAddSourceUrlDialog(manga),
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF161622),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.grey.shade700),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.add_link, size: 12, color: Colors.grey),
+                                SizedBox(width: 4),
+                                Text("Add Source Link", style: TextStyle(fontSize: 11, color: Colors.grey)),
                               ],
                             ),
                           ),
