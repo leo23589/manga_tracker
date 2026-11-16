@@ -108,20 +108,33 @@ class Manga extends ChangeNotifier {
     return unique.toList();
   }
 
+  /// Extracts the base series URL by stripping chapter numbers and junk parameters.
+  /// e.g. https://www.mgeko.cc/manga/title-chapter-82-eng/ -> https://mgeko.cc/manga/title
+  static String getBaseUrl(String url) {
+    if (url.isEmpty) return "";
+    String clean = url.trim().toLowerCase().split('?').first.split('#').first;
+    
+    // Strip www. for consistent matching
+    clean = clean.replaceFirst(RegExp(r'^(https?://)www\.'), r'$1');
+    
+    // Chop off the chapter identifier and EVERYTHING after it
+    clean = clean.replaceAll(RegExp(r'[-_/](?:chapter|chap|ch|c)[-_=]?[0-9]+(?:\.[0-9]+)?.*$', caseSensitive: false), '');
+    
+    // Remove trailing slashes
+    if (clean.endsWith('/')) clean = clean.substring(0, clean.length - 1);
+    
+    return clean;
+  }
+
   static List<String> _deduplicateUrls(List<String> urls) {
     final Map<String, String> hostToUrl = <String, String>{};
     for (final String url in urls) {
-      final String cleanUrl = url.trim();
-      if (cleanUrl.isEmpty) continue;
+      if (url.trim().isEmpty) continue;
       try {
-        final Uri uri = Uri.parse(cleanUrl);
-        String host = uri.host.toLowerCase();
-        if (host.startsWith('www.')) host = host.substring(4);
-        
-        // Convert to a base template URL format (e.g. /chapter-188 -> /chapter-[chap])
-        String template = cleanUrl.replaceAll(RegExp(r'([-_/](?:chapter|chap|ch|c)[-_=]?)[0-9]+(?:\.[0-9]+)?', caseSensitive: false), r'${1}1');
-        
-        hostToUrl[host] = template;
+        final String baseTemplate = getBaseUrl(url);
+        final Uri uri = Uri.parse(baseTemplate);
+        final String host = uri.host;
+        hostToUrl[host] = baseTemplate;
       } catch (_) {}
     }
     return hostToUrl.values.toList();
@@ -272,25 +285,19 @@ class Manga extends ChangeNotifier {
   void addSourceUrl(String? url) {
     if (url == null || url.trim().isEmpty) return;
     try {
-      final String cleanUrl = url.trim();
-      final Uri newUri = Uri.parse(cleanUrl);
-      String newHost = newUri.host.toLowerCase();
-      if (newHost.startsWith('www.')) newHost = newHost.substring(4);
+      final String baseTemplate = getBaseUrl(url);
+      final Uri newUri = Uri.parse(baseTemplate);
+      final String newHost = newUri.host;
       
-      // Transform incoming URL into a Chapter 1 template
-      String template = cleanUrl.replaceAll(RegExp(r'([-_/](?:chapter|chap|ch|c)[-_=]?)[0-9]+(?:\.[0-9]+)?', caseSensitive: false), r'${1}1');
-      
-      // Remove any existing URL from the same host, then add the new template
+      // Remove any existing URL from the same host, then add the new generic base template
       sourceUrls.removeWhere((s) {
         try {
-          String sHost = Uri.parse(s).host.toLowerCase();
-          if (sHost.startsWith('www.')) sHost = sHost.substring(4);
-          return sHost == newHost;
+          return Uri.parse(s).host == newHost;
         } catch (_) {
           return false;
         }
       });
-      sourceUrls.add(template);
+      sourceUrls.add(baseTemplate);
       _touch();
     } catch (_) {}
   }

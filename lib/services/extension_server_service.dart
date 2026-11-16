@@ -358,15 +358,13 @@ class ExtensionServerService extends ChangeNotifier {
         break;
       }
       
-      // URL exact match logic
+      // URL exact Base matching logic
       if (url != null && url.isNotEmpty) {
         try {
-          String cleanUrlTemplate = url.trim().toLowerCase().split('?').first.split('#').first;
-          cleanUrlTemplate = cleanUrlTemplate.replaceAll(RegExp(r'([-_/](?:chapter|chap|ch|c)[-_=]?)[0-9]+(?:\.[0-9]+)?', caseSensitive: false), r'${1}1');
-
+          final String incomingBaseUrl = Manga.getBaseUrl(url);
           if (m.sourceUrls.any((s) {
-            final String cleanSavedUrl = s.trim().toLowerCase().split('?').first.split('#').first;
-            return cleanSavedUrl == cleanUrlTemplate;
+            final String savedBaseUrl = Manga.getBaseUrl(s);
+            return savedBaseUrl.isNotEmpty && incomingBaseUrl.isNotEmpty && savedBaseUrl == incomingBaseUrl;
           })) {
              matchedManga = m;
              break;
