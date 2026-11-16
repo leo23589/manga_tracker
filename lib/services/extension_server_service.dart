@@ -375,58 +375,8 @@ class ExtensionServerService extends ChangeNotifier {
       }
     }
 
-    // 2. Search MangaDex & AniList in background
-    if (matchedManga == null) {
-      try {
-        final results = await MangaDexService.searchManga(formattedTitle);
-        if (results.isNotEmpty) {
-          final bestMatch = results.first;
-          final String normOfficial = normalizeTitle(bestMatch.title);
-
-          for (final Manga m in collection.mangas) {
-            if (m.mangadexId == bestMatch.id) {
-              matchedManga = m;
-              break;
-            }
-            if (normalizeTitle(m.title) == normOfficial) {
-              matchedManga = m;
-              m.updateMangaDexId(bestMatch.id);
-              m.updateAltTitles(bestMatch.altTitles);
-              break;
-            }
-            if (m.altTitles.any((alt) => normalizeTitle(alt) == normOfficial)) {
-              matchedManga = m;
-              m.updateMangaDexId(bestMatch.id);
-              m.updateAltTitles(bestMatch.altTitles);
-              break;
-            }
-          }
-        }
-      } catch (_) {}
-    }
-
-    if (matchedManga == null) {
-      try {
-        final aniResults = await AniListService.searchManga(formattedTitle);
-        if (aniResults.isNotEmpty) {
-          final bestAni = aniResults.first;
-          final String normAni = normalizeTitle(bestAni.title);
-
-          for (final Manga m in collection.mangas) {
-            if (m.anilistId == bestAni.id) {
-              matchedManga = m;
-              break;
-            }
-            if (normalizeTitle(m.title) == normAni) {
-              matchedManga = m;
-              m.updateAniListId(bestAni.id);
-              m.updateAltTitles([...m.altTitles, ...bestAni.altTitles]);
-              break;
-            }
-          }
-        }
-      } catch (_) {}
-    }
+    // 2. Search MangaDex & AniList in background -> DISABLED per user request
+    // We no longer automatically search online databases if the title is not in the local library.
 
     // 3. Handle Chapter Update vs Suggestion
     if (matchedManga != null) {
@@ -480,7 +430,6 @@ class ExtensionServerService extends ChangeNotifier {
           url: url,
         );
         _pendingQueue.add(pending);
-        _fetchPendingCoverAndEnglishTitle(pending);
       }
 
       _addLog("New Suggestion", "Detected '$formattedTitle' (${isChapter ? 'Ch. $chapter' : 'Title Page'})");
@@ -498,30 +447,6 @@ class ExtensionServerService extends ChangeNotifier {
         );
       }
     }
-  }
-
-  Future<void> _fetchPendingCoverAndEnglishTitle(PendingMangaUpdate pending) async {
-    try {
-      final results = await MangaDexService.searchManga(pending.formattedTitle);
-      if (results.isNotEmpty) {
-        final bestMatch = results.first;
-        if (bestMatch.title.isNotEmpty && bestMatch.title != 'Untitled') {
-          pending.formattedTitle = bestMatch.title;
-        }
-        pending.coverUrl = bestMatch.coverUrl;
-        notifyListeners();
-      } else {
-        final aniResults = await AniListService.searchManga(pending.formattedTitle);
-        if (aniResults.isNotEmpty) {
-          final bestAni = aniResults.first;
-          if (bestAni.title.isNotEmpty) {
-            pending.formattedTitle = bestAni.title;
-          }
-          pending.coverUrl = bestAni.coverUrl;
-          notifyListeners();
-        }
-      }
-    } catch (_) {}
   }
 
   void updatePendingWithApiData(
@@ -549,13 +474,7 @@ class ExtensionServerService extends ChangeNotifier {
     _pendingQueue.remove(pending);
     notifyListeners();
 
-    // Auto-add pending title as alternative title if not present
-    final String cleanPendingTitle = pending.formattedTitle.trim();
-    if (cleanPendingTitle.isNotEmpty &&
-        cleanPendingTitle.toLowerCase() != targetManga.title.toLowerCase() &&
-        !targetManga.altTitles.any((a) => a.toLowerCase() == cleanPendingTitle.toLowerCase())) {
-      targetManga.updateAltTitles([...targetManga.altTitles, cleanPendingTitle]);
-    }
+    // No longer automatically adds pending title to altTitles per user request.
 
     if (pending.isChapter && pending.chapter > targetManga.currentChapter) {
       targetManga.updateChapter(pending.chapter);
@@ -568,17 +487,6 @@ class ExtensionServerService extends ChangeNotifier {
       targetManga.addSourceUrl(pending.url);
     }
 
-    if (!targetManga.isMangaDexLinked) {
-      try {
-        final results = await MangaDexService.searchManga(targetManga.title);
-        if (results.isNotEmpty) {
-          final bestMatch = results.first;
-          targetManga.updateMangaDexId(bestMatch.id);
-          targetManga.updateAltTitles([...targetManga.altTitles, ...bestMatch.altTitles]);
-        }
-      } catch (_) {}
-    }
-
     final String msg = "Linked '${pending.formattedTitle}' to '${targetManga.displayTitle}'!";
     _lastNotificationMessage = msg;
     _addLog("Linked Manga", msg);
@@ -589,50 +497,17 @@ class ExtensionServerService extends ChangeNotifier {
     _pendingQueue.remove(pending);
     notifyListeners();
 
-    String? coverUrl = pending.coverUrl;
-    String synopsis = pending.synopsis;
-    List<String> tags = pending.themes;
-    String? mangadexId = pending.mangadexId;
-    int? anilistId = pending.anilistId;
-    List<String> altTitlesList = pending.altTitles;
-
-    if (!pending.isManuallyLinked) {
-      try {
-        final results = await MangaDexService.searchManga(pending.formattedTitle);
-        if (results.isNotEmpty) {
-          final bestMatch = results.first;
-          mangadexId = bestMatch.id;
-          coverUrl = await MangaDexService.downloadCoverImageLocally(bestMatch.coverUrl);
-          synopsis = bestMatch.synopsis;
-          tags = List<String>.from(bestMatch.tags);
-          if (!tags.contains("MangaDex")) tags.add("MangaDex");
-          altTitlesList = List<String>.from(bestMatch.altTitles);
-        } else {
-          final aniResults = await AniListService.searchManga(pending.formattedTitle);
-          if (aniResults.isNotEmpty) {
-            final bestAni = aniResults.first;
-            anilistId = bestAni.id;
-            coverUrl = await AniListService.downloadCoverImageLocally(bestAni.coverUrl);
-            synopsis = bestAni.synopsis;
-            tags = List<String>.from(bestAni.tags);
-            if (!tags.contains("AniList")) tags.add("AniList");
-            altTitlesList = List<String>.from(bestAni.altTitles);
-          }
-        }
-      } catch (_) {}
-    }
-
     final Manga newManga = Manga(
       title: pending.formattedTitle,
       currentChapter: pending.chapter,
-      imagePath: coverUrl,
-      synopsis: synopsis,
-      themes: tags,
+      imagePath: pending.coverUrl,
+      synopsis: pending.synopsis,
+      themes: pending.themes,
       rating: 0,
       status: pending.defaultStatus,
-      mangadexId: mangadexId,
-      anilistId: anilistId,
-      altTitles: altTitlesList,
+      mangadexId: pending.mangadexId,
+      anilistId: pending.anilistId,
+      altTitles: pending.altTitles,
       sourceUrls: pending.url != null ? <String>[pending.url!] : <String>[],
     );
 
