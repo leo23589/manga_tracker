@@ -187,9 +187,13 @@ function cleanTitleSlug(slug) {
   if (!slug) return "";
   let clean = slug.trim();
 
-  // 1. Remove ONLY exact known language/release tags from the end
-  // We DO NOT use generic [a-z0-9] anymore as it destroyed words like "stream"
-  clean = clean.replace(/(?:[-_](?:eng|li|raw|sub|dub|v[0-9]+|chapter|chap|ch|comic|manga|read))+$/gi, "");
+  // Strip random hash suffixes and language tags from the end FIRST
+  clean = clean
+    .replace(/-(?:eng|li|raw|sub|dub|v[0-9]+)$/gi, "")
+    .replace(/-(?:[a-z0-9]{3,7})$/gi, "")
+    .replace(/^(manga|read|comic)-/i, "")
+    .replace(/-(manga|read|comic)$/i, "")
+    .trim();
 
   let parts = clean.split(/[-_]/).filter(Boolean);
 
@@ -198,14 +202,13 @@ function cleanTitleSlug(slug) {
 
     const isOrdinal = /^[0-9]+(st|nd|rd|th)$/i.test(first);
     const isPlainNumber = /^[0-9]+$/.test(first);
-    const isCommonWord = /^(the|a|an|in|on|at|to|for|of|is|i|my|our)$/i.test(first);
 
-    // Strict check for prefix hashes: must contain at least one number AND at least one letter
+    // Strict check for prefix hashes: MUST contain at least one number AND at least one letter. Length 3 to 8.
     const isMixedCode = /^(?=[a-z0-9]*[0-9])(?=[a-z0-9]*[a-z])[a-z0-9]{3,8}$/i.test(first);
-    // Completely generic random letter sequence that shouldn't start a sentence
-    const isRandomGibberish = /^[a-z]{4,6}$/i.test(first) && !isCommonWord && !/^(solo|return|hero|tower|player|rank|god|king|demon|magic|sword|reincarnators?)$/i.test(first);
 
-    if ((isMixedCode || isRandomGibberish) && !isOrdinal && !isPlainNumber && !isCommonWord) {
+    // If it's pure letters, we NEVER drop it unless it's known generic trash like 'mcqyg'.
+    // Removing the generic 'isRandomGibberish' word dropper completely prevents dropping words like 'damn'.
+    if (isMixedCode && !isOrdinal && !isPlainNumber) {
       parts.shift();
     }
   }
