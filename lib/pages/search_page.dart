@@ -216,6 +216,15 @@ class _SearchPageState extends State<SearchPage> {
                         decoration: InputDecoration(
                           hintText: "Search in my library...",
                           prefixIcon: const Icon(Icons.search),
+                          suffixIcon: _localSearchController.text.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear),
+                                  onPressed: () {
+                                    _localSearchController.clear();
+                                    setState(() {});
+                                  },
+                                )
+                              : null,
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                           filled: true,
                           fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withAlpha((255 * 0.3).round()),
@@ -316,14 +325,28 @@ class _SearchPageState extends State<SearchPage> {
                   decoration: InputDecoration(
                     hintText: "Search MangaDex online...",
                     prefixIcon: const Icon(Icons.travel_explore),
-                    suffixIcon: IconButton(
-                      icon: const Icon(Icons.search),
-                      onPressed: _performMangaDexSearch,
+                    suffixIcon: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_mangadexSearchController.text.isNotEmpty)
+                          IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () {
+                              _mangadexSearchController.clear();
+                              setState(() {});
+                            },
+                          ),
+                        IconButton(
+                          icon: const Icon(Icons.search),
+                          onPressed: _performMangaDexSearch,
+                        ),
+                      ],
                     ),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                     filled: true,
                     fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withAlpha((255 * 0.3).round()),
                   ),
+                  onChanged: (String val) => setState(() {}),
                 ),
               ),
               const Divider(height: 1),
@@ -376,14 +399,28 @@ class _SearchPageState extends State<SearchPage> {
                   decoration: InputDecoration(
                     hintText: "Search AniList online...",
                     prefixIcon: const Icon(Icons.auto_awesome, color: Colors.cyanAccent),
-                    suffixIcon: IconButton(
-                      icon: const Icon(Icons.search),
-                      onPressed: _performAniListSearch,
+                    suffixIcon: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_anilistSearchController.text.isNotEmpty)
+                          IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () {
+                              _anilistSearchController.clear();
+                              setState(() {});
+                            },
+                          ),
+                        IconButton(
+                          icon: const Icon(Icons.search),
+                          onPressed: _performAniListSearch,
+                        ),
+                      ],
                     ),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                     filled: true,
                     fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withAlpha((255 * 0.3).round()),
                   ),
+                  onChanged: (String val) => setState(() {}),
                 ),
               ),
               const Divider(height: 1),
