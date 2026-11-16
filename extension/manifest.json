@@ -1,8 +1,13 @@
 {
   "manifest_version": 2,
   "name": "Manga Tracker Sync",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Automatically updates read chapters in your Manga Tracker Flutter app when closing tabs on allowed manga websites.",
+  "icons": {
+    "48": "icons/icon.png",
+    "96": "icons/icon.png",
+    "128": "icons/icon.png"
+  },
   "browser_specific_settings": {
     "gecko": {
       "id": "manga_tracker@leo23589.com",
@@ -29,6 +34,7 @@
     "open_in_tab": true
   },
   "browser_action": {
+    "default_icon": "icons/icon.png",
     "default_title": "Manga Tracker Settings",
     "default_popup": "options.html"
   }
