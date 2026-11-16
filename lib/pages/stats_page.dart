@@ -75,7 +75,7 @@ class StatsPage extends StatelessWidget {
     final Map<String, int> tagCounts = <String, int>{};
     for (Manga m in mangas) {
       for (String t in m.themes) {
-        if (["Manga", "Manhwa", "Manhua", "MangaDex", "AniList", "Linked"].contains(t)) {
+        if (["Manga", "Manhwa", "Manhua", "MangaDex", "AniList", "Linked", "Adaptation"].contains(t)) {
           continue;
         }
         tagCounts[t] = (tagCounts[t] ?? 0) + 1;
