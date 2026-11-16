@@ -4,8 +4,6 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/manga.dart';
-import 'anilist_service.dart';
-import 'mangadex_service.dart';
 import 'notification_service.dart';
 
 class ActivityLogEntry {
@@ -360,13 +358,15 @@ class ExtensionServerService extends ChangeNotifier {
         break;
       }
       
-      // URL exact match logic (safeguard against fuzzy matching wrong manga)
+      // URL exact match logic
       if (url != null && url.isNotEmpty) {
         try {
-          final String cleanUrl = url.trim().toLowerCase().split('?').first.split('#').first;
+          String cleanUrlTemplate = url.trim().toLowerCase().split('?').first.split('#').first;
+          cleanUrlTemplate = cleanUrlTemplate.replaceAll(RegExp(r'([-_/](?:chapter|chap|ch|c)[-_=]?)[0-9]+(?:\.[0-9]+)?', caseSensitive: false), r'${1}1');
+
           if (m.sourceUrls.any((s) {
             final String cleanSavedUrl = s.trim().toLowerCase().split('?').first.split('#').first;
-            return cleanSavedUrl == cleanUrl;
+            return cleanSavedUrl == cleanUrlTemplate;
           })) {
              matchedManga = m;
              break;
@@ -374,9 +374,6 @@ class ExtensionServerService extends ChangeNotifier {
         } catch (_) {}
       }
     }
-
-    // 2. Search MangaDex & AniList in background -> DISABLED per user request
-    // We no longer automatically search online databases if the title is not in the local library.
 
     // 3. Handle Chapter Update vs Suggestion
     if (matchedManga != null) {
@@ -473,8 +470,6 @@ class ExtensionServerService extends ChangeNotifier {
   Future<void> linkPendingToExisting(Manga targetManga, PendingMangaUpdate pending) async {
     _pendingQueue.remove(pending);
     notifyListeners();
-
-    // No longer automatically adds pending title to altTitles per user request.
 
     if (pending.isChapter && pending.chapter > targetManga.currentChapter) {
       targetManga.updateChapter(pending.chapter);

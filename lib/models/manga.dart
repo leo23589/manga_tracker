@@ -117,8 +117,11 @@ class Manga extends ChangeNotifier {
         final Uri uri = Uri.parse(cleanUrl);
         String host = uri.host.toLowerCase();
         if (host.startsWith('www.')) host = host.substring(4);
-        // Save the most recent/relevant url for this host
-        hostToUrl[host] = cleanUrl;
+        
+        // Convert to a base template URL format (e.g. /chapter-188 -> /chapter-[chap])
+        String template = cleanUrl.replaceAll(RegExp(r'([-_/](?:chapter|chap|ch|c)[-_=]?)[0-9]+(?:\.[0-9]+)?', caseSensitive: false), r'${1}1');
+        
+        hostToUrl[host] = template;
       } catch (_) {}
     }
     return hostToUrl.values.toList();
@@ -274,7 +277,10 @@ class Manga extends ChangeNotifier {
       String newHost = newUri.host.toLowerCase();
       if (newHost.startsWith('www.')) newHost = newHost.substring(4);
       
-      // Remove any existing URL from the same host, then add the new one
+      // Transform incoming URL into a Chapter 1 template
+      String template = cleanUrl.replaceAll(RegExp(r'([-_/](?:chapter|chap|ch|c)[-_=]?)[0-9]+(?:\.[0-9]+)?', caseSensitive: false), r'${1}1');
+      
+      // Remove any existing URL from the same host, then add the new template
       sourceUrls.removeWhere((s) {
         try {
           String sHost = Uri.parse(s).host.toLowerCase();
@@ -284,7 +290,7 @@ class Manga extends ChangeNotifier {
           return false;
         }
       });
-      sourceUrls.add(cleanUrl);
+      sourceUrls.add(template);
       _touch();
     } catch (_) {}
   }
