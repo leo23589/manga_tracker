@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
@@ -377,6 +378,9 @@ class Manga extends ChangeNotifier {
 class MangaCollectionData extends ChangeNotifier {
   MangaSortOption _sortOption = MangaSortOption.lastAdded;
   List<Manga> _mangas = <Manga>[];
+  
+  // Debouncer for disk saving
+  Timer? _saveDebouncer;
 
   MangaCollectionData() {
     _loadData();
@@ -412,10 +416,23 @@ class MangaCollectionData extends ChangeNotifier {
     return File('${directory.path}/mangas.json');
   }
 
-  Future<void> _saveData() async {
-    final file = await _localFile;
-    final String jsonString = jsonEncode(_mangas.map((m) => m.toMap()).toList());
-    await file.writeAsString(jsonString);
+  // Debounced save operation to prevent UI thread blockage on fast consecutive updates
+  void _scheduleSave() {
+    if (_saveDebouncer?.isActive ?? false) _saveDebouncer!.cancel();
+    _saveDebouncer = Timer(const Duration(milliseconds: 500), () async {
+      final file = await _localFile;
+      // Isolate parsing via compute to free main UI thread if list gets large
+      final String jsonString = await compute(_encodeMangaList, _mangas.map((m) => m.toMap()).toList());
+      await file.writeAsString(jsonString);
+    });
+  }
+  
+  static String _encodeMangaList(List<Map<String, dynamic>> maps) {
+    return jsonEncode(maps);
+  }
+  
+  static List<dynamic> _decodeMangaList(String jsonString) {
+    return jsonDecode(jsonString);
   }
 
   Future<void> _loadData() async {
@@ -423,11 +440,11 @@ class MangaCollectionData extends ChangeNotifier {
       final file = await _localFile;
       if (await file.exists()) {
         final String jsonString = await file.readAsString();
-        final List<dynamic> jsonList = jsonDecode(jsonString);
+        final List<dynamic> jsonList = await compute(_decodeMangaList, jsonString);
         _mangas = jsonList.map((m) => Manga.fromMap(m)).toList();
         
         for (var manga in _mangas) {
-          manga.addListener(_saveData);
+          manga.addListener(_scheduleSave);
         }
         
         notifyListeners();
@@ -440,9 +457,9 @@ class MangaCollectionData extends ChangeNotifier {
             themes: ["Adventure", "Fantasy", "Action", "Comedy", "Manga"],
             rating: 9,
             status: MangaStatus.reading,
-          )..addListener(_saveData),
+          )..addListener(_scheduleSave),
         ];
-        await _saveData();
+        _scheduleSave();
         notifyListeners();
       }
     } catch (e) {
@@ -452,7 +469,7 @@ class MangaCollectionData extends ChangeNotifier {
 
   Future<bool> importData(String jsonString) async {
     try {
-      final List<dynamic> jsonList = jsonDecode(jsonString);
+      final List<dynamic> jsonList = await compute(_decodeMangaList, jsonString);
       final Directory appDir = await getApplicationDocumentsDirectory();
 
       final List<Manga> newMangas = <Manga>[];
@@ -482,15 +499,15 @@ class MangaCollectionData extends ChangeNotifier {
       }
 
       for (var manga in _mangas) {
-        manga.removeListener(_saveData);
+        manga.removeListener(_scheduleSave);
       }
 
       _mangas = newMangas;
       for (var manga in _mangas) {
-        manga.addListener(_saveData);
+        manga.addListener(_scheduleSave);
       }
       
-      await _saveData();
+      _scheduleSave();
       notifyListeners();
       return true;
     } catch (e) {
@@ -519,20 +536,20 @@ class MangaCollectionData extends ChangeNotifier {
       exportList.add(map);
     }
 
-    return jsonEncode(exportList);
+    return await compute(_encodeMangaList, exportList);
   }
 
   void addManga(Manga manga) {
     _mangas.add(manga);
-    manga.addListener(_saveData);
-    _saveData();
+    manga.addListener(_scheduleSave);
+    _scheduleSave();
     notifyListeners();
   }
 
   void deleteManga(Manga manga) {
-    manga.removeListener(_saveData);
+    manga.removeListener(_scheduleSave);
     _mangas.remove(manga);
-    _saveData();
+    _scheduleSave();
     notifyListeners();
   }
 }

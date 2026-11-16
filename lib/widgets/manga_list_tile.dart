@@ -46,11 +46,25 @@ class MangaListTile extends StatelessWidget {
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute<void>(
-                      builder: (BuildContext context) => ChangeNotifierProvider<Manga>.value(
+                    PageRouteBuilder<void>(
+                      transitionDuration: const Duration(milliseconds: 150),
+                      reverseTransitionDuration: const Duration(milliseconds: 150),
+                      pageBuilder: (context, animation, secondaryAnimation) => ChangeNotifierProvider<Manga>.value(
                         value: currentManga,
                         child: MangaDetailPage(manga: currentManga),
                       ),
+                      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                        return SlideTransition(
+                          position: Tween<Offset>(
+                            begin: const Offset(0.05, 0.0),
+                            end: Offset.zero,
+                          ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutQuad)),
+                          child: FadeTransition(
+                            opacity: animation,
+                            child: child,
+                          ),
+                        );
+                      },
                     ),
                   );
                 },
