@@ -1,5 +1,8 @@
+import '../../providers/manga_provider.dart';
 import 'package:flutter/material.dart';
 import '../../models/manga.dart';
+
+
 import '../../services/mangadex_service.dart';
 import '../manga_cover_image.dart';
 import '../tag_selector.dart';

@@ -1,9 +1,5 @@
-import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:path_provider/path_provider.dart';
-import '../core/constants.dart';
+import '../utils/manga_utils.dart';
 
 enum MangaSortOption {
   lastAdded,
@@ -75,9 +71,9 @@ class Manga extends ChangeNotifier {
     List<String>? sourceUrls,
     DateTime? createdAt,
     DateTime? lastUpdated,
-  })  : themes = _sortTags(themes, mangadexId, anilistId),
-        altTitles = _deduplicateStrings(altTitles ?? <String>[], title),
-        sourceUrls = _deduplicateUrls(sourceUrls ?? <String>[]),
+  })  : themes = MangaUtils.sortTags(themes, mangadexId, anilistId),
+        altTitles = MangaUtils.deduplicateStrings(altTitles ?? <String>[], title),
+        sourceUrls = MangaUtils.deduplicateUrls(sourceUrls ?? <String>[]),
         createdAt = createdAt ?? DateTime.now(),
         lastUpdated = lastUpdated ?? createdAt ?? DateTime.now();
 
@@ -86,112 +82,6 @@ class Manga extends ChangeNotifier {
   bool get isLinked => isMangaDexLinked || isAniListLinked;
 
   String get displayTitle => title.trim();
-
-  static bool _looksLikeEnglishTitle(String text) {
-    if (text.isEmpty) return false;
-    final RegExp englishWords = RegExp(
-      r'\b(the|a|an|leveling|solo|return|hero|tower|player|rank|system|god|lord|king|princess|queen|demon|magic|sword|reincarnation|villain|extra|guide|strategy|conquer|hunter|necromancer|archmage|academy|saint|dungeon|master|heavenly|dragon|star|shadow|blade|realm|emperor|legend|infinite|regressor|transmigrated)\b',
-      caseSensitive: false,
-    );
-    return englishWords.hasMatch(text);
-  }
-
-  static List<String> _deduplicateStrings(List<String> list, String primary) {
-    final Set<String> unique = <String>{};
-    for (final String item in list) {
-      final String clean = item.trim();
-      if (clean.isNotEmpty && clean.toLowerCase() != primary.trim().toLowerCase()) {
-        if (!unique.any((u) => u.toLowerCase() == clean.toLowerCase())) {
-          unique.add(clean);
-        }
-      }
-    }
-    return unique.toList();
-  }
-
-  /// Extracts the base series URL by stripping chapter numbers and junk parameters.
-  /// e.g. https://www.mgeko.cc/manga/title-chapter-82-eng/ -> https://mgeko.cc/manga/title
-  static String getBaseUrl(String url) {
-    if (url.isEmpty) return "";
-    String clean = url.trim().toLowerCase().split('?').first.split('#').first;
-    
-    // Strip www. for consistent matching
-    clean = clean.replaceFirst(RegExp(r'^(https?://)www\.'), r'$1');
-    
-    // Chop off the chapter identifier and EVERYTHING after it
-    clean = clean.replaceAll(RegExp(r'[-_/](?:chapter|chap|ch|c)[-_=]?[0-9]+(?:\.[0-9]+)?.*$', caseSensitive: false), '');
-    
-    // Remove trailing slashes
-    if (clean.endsWith('/')) clean = clean.substring(0, clean.length - 1);
-    
-    return clean;
-  }
-
-  static List<String> _deduplicateUrls(List<String> urls) {
-    final Map<String, String> hostToUrl = <String, String>{};
-    for (final String url in urls) {
-      if (url.trim().isEmpty) continue;
-      try {
-        final String baseTemplate = getBaseUrl(url);
-        final Uri uri = Uri.parse(baseTemplate);
-        final String host = uri.host;
-        hostToUrl[host] = baseTemplate;
-      } catch (_) {}
-    }
-    return hostToUrl.values.toList();
-  }
-
-  static List<String> _sortTags(List<String> tagsInput, String? mId, int? aId) {
-    List<String> sorted = List<String>.from(tagsInput);
-
-    sorted.removeWhere((t) => t.toLowerCase() == 'long strip');
-    sorted.remove("Linked");
-
-    if (mId != null && mId.isNotEmpty) {
-      if (!sorted.contains("MangaDex")) sorted.add("MangaDex");
-    } else {
-      sorted.remove("MangaDex");
-    }
-
-    if (aId != null) {
-      if (!sorted.contains("AniList")) sorted.add("AniList");
-    } else {
-      sorted.remove("AniList");
-    }
-
-    if (sorted.contains("Manhwa")) {
-      sorted.remove("Manga");
-      sorted.remove("Manhua");
-    } else if (sorted.contains("Manhua")) {
-      sorted.remove("Manga");
-    } else if (!sorted.any((t) => AppConstants.content.contains(t))) {
-      sorted.insert(0, "Manga");
-    }
-
-    final Set<String> uniqueTags = <String>{};
-    final List<String> deduped = <String>[];
-    for (final String t in sorted) {
-      if (!uniqueTags.contains(t.toLowerCase())) {
-        uniqueTags.add(t.toLowerCase());
-        deduped.add(t);
-      }
-    }
-
-    deduped.sort((String a, String b) {
-      int getPriority(String tag) {
-        if (tag == "MangaDex" || tag == "AniList") return -1;
-        if (AppConstants.content.contains(tag)) return 0;
-        if (AppConstants.themes.contains(tag)) return 1;
-        if (AppConstants.genres.contains(tag)) return 2;
-        return 3;
-      }
-      int priorityA = getPriority(a);
-      int priorityB = getPriority(b);
-      if (priorityA != priorityB) return priorityA.compareTo(priorityB);
-      return a.compareTo(b);
-    });
-    return deduped;
-  }
 
   void mergeMangaDetails({
     String? newTitle,
@@ -208,7 +98,7 @@ class Manga extends ChangeNotifier {
 
     String bestTitle = title;
     for (final String cand in candidateTitles) {
-      if (_looksLikeEnglishTitle(cand)) {
+      if (MangaUtils.looksLikeEnglishTitle(cand)) {
         bestTitle = cand;
         break;
       }
@@ -232,8 +122,8 @@ class Manga extends ChangeNotifier {
     if (newMangaDexId != null) mangadexId = newMangaDexId;
     if (newAniListId != null) anilistId = newAniListId;
 
-    altTitles = _deduplicateStrings(combinedAltList, title);
-    themes = _sortTags([...themes, ...?newTags], mangadexId, anilistId);
+    altTitles = MangaUtils.deduplicateStrings(combinedAltList, title);
+    themes = MangaUtils.sortTags([...themes, ...?newTags], mangadexId, anilistId);
 
     if (newCoverPath != null && newCoverPath.isNotEmpty) {
       imagePath = newCoverPath;
@@ -286,11 +176,10 @@ class Manga extends ChangeNotifier {
   void addSourceUrl(String? url) {
     if (url == null || url.trim().isEmpty) return;
     try {
-      final String baseTemplate = getBaseUrl(url);
+      final String baseTemplate = MangaUtils.getBaseUrl(url);
       final Uri newUri = Uri.parse(baseTemplate);
       final String newHost = newUri.host;
       
-      // Remove any existing URL from the same host, then add the new generic base template
       sourceUrls.removeWhere((s) {
         try {
           return Uri.parse(s).host == newHost;
@@ -315,19 +204,19 @@ class Manga extends ChangeNotifier {
 
   void updateAltTitles(List<String> newAltTitles) {
     final List<String> combined = <String>[...altTitles, ...newAltTitles];
-    altTitles = _deduplicateStrings(combined, title);
+    altTitles = MangaUtils.deduplicateStrings(combined, title);
     _touch();
   }
 
   void updateMangaDexId(String? id) {
     mangadexId = id;
-    themes = _sortTags(themes, mangadexId, anilistId);
+    themes = MangaUtils.sortTags(themes, mangadexId, anilistId);
     _touch();
   }
 
   void updateAniListId(int? id) {
     anilistId = id;
-    themes = _sortTags(themes, mangadexId, anilistId);
+    themes = MangaUtils.sortTags(themes, mangadexId, anilistId);
     _touch();
   }
 
@@ -361,7 +250,7 @@ class Manga extends ChangeNotifier {
   }
 
   void updateThemes(List<String> newThemes) {
-    themes = _sortTags(newThemes, mangadexId, anilistId);
+    themes = MangaUtils.sortTags(newThemes, mangadexId, anilistId);
     _touch();
   }
 
@@ -369,187 +258,8 @@ class Manga extends ChangeNotifier {
     if (newTitle.isNotEmpty) {
       final String oldTitle = title;
       title = newTitle;
-      altTitles = _deduplicateStrings([...altTitles, oldTitle], title);
+      altTitles = MangaUtils.deduplicateStrings([...altTitles, oldTitle], title);
       _touch();
     }
-  }
-}
-
-class MangaCollectionData extends ChangeNotifier {
-  MangaSortOption _sortOption = MangaSortOption.lastAdded;
-  List<Manga> _mangas = <Manga>[];
-  
-  // Debouncer for disk saving
-  Timer? _saveDebouncer;
-
-  MangaCollectionData() {
-    _loadData();
-  }
-
-  MangaSortOption get sortOption => _sortOption;
-  set sortOption(MangaSortOption option) {
-    _sortOption = option;
-    notifyListeners();
-  }
-
-  List<Manga> get mangas {
-    List<Manga> sortedList = List<Manga>.from(_mangas);
-    switch (_sortOption) {
-      case MangaSortOption.lastAdded:
-        sortedList.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-        break;
-      case MangaSortOption.lastUpdated:
-        sortedList.sort((a, b) => b.lastUpdated.compareTo(a.lastUpdated));
-        break;
-      case MangaSortOption.rating:
-        sortedList.sort((a, b) => b.rating.compareTo(a.rating));
-        break;
-      case MangaSortOption.title:
-        sortedList.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
-        break;
-    }
-    return sortedList;
-  }
-
-  Future<File> get _localFile async {
-    final directory = await getApplicationDocumentsDirectory();
-    return File('${directory.path}/mangas.json');
-  }
-
-  // Debounced save operation to prevent UI thread blockage on fast consecutive updates
-  void _scheduleSave() {
-    if (_saveDebouncer?.isActive ?? false) _saveDebouncer!.cancel();
-    _saveDebouncer = Timer(const Duration(milliseconds: 500), () async {
-      final file = await _localFile;
-      // Isolate parsing via compute to free main UI thread if list gets large
-      final String jsonString = await compute(_encodeMangaList, _mangas.map((m) => m.toMap()).toList());
-      await file.writeAsString(jsonString);
-    });
-  }
-  
-  static String _encodeMangaList(List<Map<String, dynamic>> maps) {
-    return jsonEncode(maps);
-  }
-  
-  static List<dynamic> _decodeMangaList(String jsonString) {
-    return jsonDecode(jsonString);
-  }
-
-  Future<void> _loadData() async {
-    try {
-      final file = await _localFile;
-      if (await file.exists()) {
-        final String jsonString = await file.readAsString();
-        final List<dynamic> jsonList = await compute(_decodeMangaList, jsonString);
-        _mangas = jsonList.map((m) => Manga.fromMap(m)).toList();
-        
-        for (var manga in _mangas) {
-          manga.addListener(_scheduleSave);
-        }
-        
-        notifyListeners();
-      } else {
-        _mangas = [
-          Manga(
-            title: "One Piece",
-            currentChapter: 1080,
-            synopsis: "Monkey D. Luffy, a boy whose body gained the properties of rubber...",
-            themes: ["Adventure", "Fantasy", "Action", "Comedy", "Manga"],
-            rating: 9,
-            status: MangaStatus.reading,
-          )..addListener(_scheduleSave),
-        ];
-        _scheduleSave();
-        notifyListeners();
-      }
-    } catch (e) {
-      debugPrint("Erreur lors du chargement : $e");
-    }
-  }
-
-  Future<bool> importData(String jsonString) async {
-    try {
-      final List<dynamic> jsonList = await compute(_decodeMangaList, jsonString);
-      final Directory appDir = await getApplicationDocumentsDirectory();
-
-      final List<Manga> newMangas = <Manga>[];
-
-      for (final dynamic item in jsonList) {
-        if (item is! Map<String, dynamic>) continue;
-
-        String? restoredImagePath = item['imagePath'] as String?;
-        final String? imageBase64 = item['imageBase64'] as String?;
-
-        if (imageBase64 != null && imageBase64.isNotEmpty) {
-          try {
-            final List<int> bytes = base64Decode(imageBase64);
-            final String fileName = 'imported_cover_${DateTime.now().millisecondsSinceEpoch}_${newMangas.length}.jpg';
-            final File file = File('${appDir.path}/$fileName');
-            await file.writeAsBytes(bytes);
-            restoredImagePath = file.path;
-          } catch (e) {
-            debugPrint('Failed to decode imported image: $e');
-          }
-        }
-
-        final Map<String, dynamic> mangaMap = Map<String, dynamic>.from(item);
-        mangaMap['imagePath'] = restoredImagePath;
-
-        newMangas.add(Manga.fromMap(mangaMap));
-      }
-
-      for (var manga in _mangas) {
-        manga.removeListener(_scheduleSave);
-      }
-
-      _mangas = newMangas;
-      for (var manga in _mangas) {
-        manga.addListener(_scheduleSave);
-      }
-      
-      _scheduleSave();
-      notifyListeners();
-      return true;
-    } catch (e) {
-      debugPrint("Erreur d'importation : $e");
-      return false;
-    }
-  }
-
-  Future<String> getExportJson() async {
-    final List<Map<String, dynamic>> exportList = <Map<String, dynamic>>[];
-
-    for (final Manga manga in _mangas) {
-      final Map<String, dynamic> map = manga.toMap();
-
-      if (manga.imagePath != null && manga.imagePath!.isNotEmpty) {
-        if (File(manga.imagePath!).existsSync()) {
-          try {
-            final List<int> bytes = await File(manga.imagePath!).readAsBytes();
-            map['imageBase64'] = base64Encode(bytes);
-          } catch (e) {
-            debugPrint('Failed to encode image to base64: $e');
-          }
-        }
-      }
-
-      exportList.add(map);
-    }
-
-    return await compute(_encodeMangaList, exportList);
-  }
-
-  void addManga(Manga manga) {
-    _mangas.add(manga);
-    manga.addListener(_scheduleSave);
-    _scheduleSave();
-    notifyListeners();
-  }
-
-  void deleteManga(Manga manga) {
-    manga.removeListener(_scheduleSave);
-    _mangas.remove(manga);
-    _scheduleSave();
-    notifyListeners();
   }
 }

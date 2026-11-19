@@ -1,9 +1,12 @@
+import '../../providers/manga_provider.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import '../../models/manga.dart';
+
+
 import '../../services/mangadex_service.dart';
 import '../manga_cover_image.dart';
 import '../tag_selector.dart';

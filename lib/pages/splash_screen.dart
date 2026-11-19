@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../models/manga.dart';
+import '../providers/manga_provider.dart';
 import '../services/extension_server_service.dart';
 import '../main.dart';
 

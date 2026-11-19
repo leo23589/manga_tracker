@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../models/manga.dart';
+import '../../providers/manga_provider.dart';
 import '../../services/mangadex_service.dart';
 import '../manga_cover_image.dart';
-import '../tag_selector.dart';
-import 'mangadex_detail_modal.dart';
 
 class MangaDexResultTile extends StatelessWidget {
   final MangaDexSearchResult result;
@@ -19,92 +17,63 @@ class MangaDexResultTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool isAlreadyInLibrary = collection.mangas.any(
-      (m) => m.title.toLowerCase() == result.title.toLowerCase(),
-    );
+    final bool isAlreadyInLibrary = collection.mangas.any((m) => m.mangadexId == result.id);
 
     return Card(
-      elevation: 2,
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      child: InkWell(
-        onTap: () => showMangaDexDetailModal(
-          context: context,
-          result: result,
-          collection: collection,
-          onStateUpdated: onStateUpdated,
+      margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
+      color: const Color(0xFF161622),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: ListTile(
+        contentPadding: const EdgeInsets.all(10),
+        leading: MangaCoverImage(
+          imagePath: result.coverUrl,
+          width: 50,
+          height: 75,
+          borderRadius: 6,
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(12.0),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              MangaCoverImage(
-                imagePath: result.coverUrl,
-                width: 85,
-                height: 125,
-                borderRadius: 8.0,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      result.title,
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    if (result.tags.isNotEmpty) ...[
-                      DisplayTagList(
-                        tags: result.tags.take(3).toList(),
-                        contentTagColor: Colors.red.shade700,
-                        textColor: Colors.white,
-                      ),
-                      const SizedBox(height: 6),
-                    ],
-                    Text(
-                      result.synopsis.isEmpty ? "No synopsis available." : result.synopsis,
-                      style: TextStyle(color: Colors.grey.shade400, fontSize: 12),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 8),
-                    ElevatedButton.icon(
-                      onPressed: isAlreadyInLibrary
-                          ? null
-                          : () async {
-                              final Manga manga = await result.toMangaWithLocalCover();
-                              collection.addManga(manga);
-                              onStateUpdated();
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Added "${result.title}" to your library!'),
-                                    backgroundColor: Colors.green,
-                                  ),
-                                );
-                              }
-                            },
-                      icon: Icon(isAlreadyInLibrary ? Icons.check : Icons.library_add, size: 16),
-                      label: Text(
-                        isAlreadyInLibrary ? "In Library" : "Add to Library",
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        visualDensity: VisualDensity.compact,
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        backgroundColor: isAlreadyInLibrary ? Colors.grey.shade800 : Colors.indigo,
-                        foregroundColor: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+        title: Text(result.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 4),
+            Text(
+              result.synopsis.isEmpty ? "No synopsis available." : result.synopsis,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 11, color: Colors.white60),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 4,
+              runSpacing: 4,
+              children: result.tags.take(3).map((tag) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.indigo.withAlpha((255 * 0.3).round()),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(tag, style: const TextStyle(fontSize: 9, color: Colors.indigoAccent)),
+                );
+              }).toList(),
+            ),
+          ],
         ),
+        trailing: isAlreadyInLibrary
+            ? const Icon(Icons.check_circle, color: Colors.green)
+            : IconButton(
+                icon: const Icon(Icons.add_circle_outline, color: Colors.indigoAccent),
+                onPressed: () async {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Downloading cover and adding to library...')));
+                  final manga = await result.toMangaWithLocalCover();
+                  collection.addManga(manga);
+                  onStateUpdated();
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Added ${manga.title} to library!'), backgroundColor: Colors.green));
+                  }
+                },
+              ),
       ),
     );
   }

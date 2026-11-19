@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/manga.dart';
+import '../providers/manga_provider.dart';
+import '../utils/manga_utils.dart';
 import 'notification_service.dart';
 
 class ActivityLogEntry {
@@ -302,25 +304,6 @@ class ExtensionServerService extends ChangeNotifier {
     notifyListeners();
   }
 
-  static String normalizeTitle(String title) {
-    return title
-        .replaceAll('\$', '')
-        .replaceAll('-', ' ')
-        .replaceAll('_', ' ')
-        .replaceAll(RegExp(r'\s+'), ' ')
-        .trim()
-        .toLowerCase();
-  }
-
-  static String formatTitleFromSlug(String slug) {
-    final String clean = slug.replaceAll('-', ' ').replaceAll('_', ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
-    if (clean.isEmpty) return slug;
-    return clean.split(' ').map((word) {
-      if (word.isEmpty) return '';
-      return word[0].toUpperCase() + word.substring(1).toLowerCase();
-    }).join(' ');
-  }
-
   void _processChapterUpdate({
     required String rawTitle,
     required int chapter,
@@ -328,8 +311,8 @@ class ExtensionServerService extends ChangeNotifier {
     required String? url,
     required MangaCollectionData collection,
   }) async {
-    final String normIncoming = normalizeTitle(rawTitle);
-    final String formattedTitle = formatTitleFromSlug(rawTitle);
+    final String normIncoming = MangaUtils.normalizeTitle(rawTitle);
+    final String formattedTitle = MangaUtils.formatTitleFromSlug(rawTitle);
 
     String? incomingMangaDexId;
     if (url != null && url.contains('mangadex.org')) {
@@ -339,7 +322,6 @@ class ExtensionServerService extends ChangeNotifier {
       }
     }
 
-    // 1. Direct Search in Local Collection
     Manga? matchedManga;
     for (final Manga m in collection.mangas) {
       if (incomingMangaDexId != null && m.mangadexId == incomingMangaDexId) {
@@ -347,23 +329,21 @@ class ExtensionServerService extends ChangeNotifier {
         break;
       }
       
-      // Strict matching for titles and altTitles (Exact Match)
-      if (normalizeTitle(m.title) == normIncoming) {
+      if (MangaUtils.normalizeTitle(m.title) == normIncoming) {
         matchedManga = m;
         break;
       }
 
-      if (m.altTitles.any((alt) => normalizeTitle(alt) == normIncoming)) {
+      if (m.altTitles.any((alt) => MangaUtils.normalizeTitle(alt) == normIncoming)) {
         matchedManga = m;
         break;
       }
       
-      // URL exact Base matching logic
       if (url != null && url.isNotEmpty) {
         try {
-          final String incomingBaseUrl = Manga.getBaseUrl(url);
+          final String incomingBaseUrl = MangaUtils.getBaseUrl(url);
           if (m.sourceUrls.any((s) {
-            final String savedBaseUrl = Manga.getBaseUrl(s);
+            final String savedBaseUrl = MangaUtils.getBaseUrl(s);
             return savedBaseUrl.isNotEmpty && incomingBaseUrl.isNotEmpty && savedBaseUrl == incomingBaseUrl;
           })) {
              matchedManga = m;
@@ -373,7 +353,6 @@ class ExtensionServerService extends ChangeNotifier {
       }
     }
 
-    // 3. Handle Chapter Update vs Suggestion
     if (matchedManga != null) {
       if (url != null) matchedManga.addSourceUrl(url);
 
@@ -412,7 +391,7 @@ class ExtensionServerService extends ChangeNotifier {
     } else {
       final MangaStatus initialStatus = isChapter ? MangaStatus.reading : MangaStatus.planToRead;
 
-      final int existingIndex = _pendingQueue.indexWhere((p) => normalizeTitle(p.rawTitle) == normIncoming);
+      final int existingIndex = _pendingQueue.indexWhere((p) => MangaUtils.normalizeTitle(p.rawTitle) == normIncoming);
       if (existingIndex >= 0) {
         _pendingQueue[existingIndex].chapter = chapter;
       } else {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/manga.dart';
+import '../providers/manga_provider.dart';
 import '../services/anilist_service.dart';
 import '../services/mangadex_service.dart';
 import '../widgets/manga_widgets.dart';

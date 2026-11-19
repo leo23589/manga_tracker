@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'models/manga.dart';
+import 'providers/manga_provider.dart';
 import 'pages/manga_list_page.dart';
 import 'pages/search_page.dart';
 import 'pages/splash_screen.dart';
