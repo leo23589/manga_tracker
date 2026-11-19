@@ -1,10 +1,12 @@
+import '../providers/manga_provider.dart';
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/manga.dart';
-import '../providers/manga_provider.dart';
+
 import '../utils/manga_utils.dart';
 import 'notification_service.dart';
 

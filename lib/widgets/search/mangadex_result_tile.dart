@@ -1,5 +1,7 @@
-import 'package:flutter/material.dart';
 import '../../providers/manga_provider.dart';
+
+import 'package:flutter/material.dart';
+
 import '../../services/mangadex_service.dart';
 import '../manga_cover_image.dart';
 

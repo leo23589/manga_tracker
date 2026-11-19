@@ -1,6 +1,8 @@
+import '../providers/manga_provider.dart';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/manga_provider.dart';
+
 import '../services/extension_server_service.dart';
 import '../main.dart';
 

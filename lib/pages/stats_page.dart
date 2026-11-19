@@ -1,3 +1,5 @@
+import '../providers/manga_provider.dart';
+
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -5,7 +7,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/manga.dart';
-import '../providers/manga_provider.dart';
+
 import '../services/extension_server_service.dart';
 
 class StatsPage extends StatelessWidget {
