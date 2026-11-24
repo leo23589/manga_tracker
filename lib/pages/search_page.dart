@@ -1,9 +1,8 @@
+import 'dart:async';
 import '../providers/manga_provider.dart';
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/manga.dart';
-
 import '../services/anilist_service.dart';
 import '../services/mangadex_service.dart';
 import '../widgets/manga_widgets.dart';
@@ -19,11 +18,15 @@ class SearchPage extends StatefulWidget {
   State<SearchPage> createState() => _SearchPageState();
 }
 
-class _SearchPageState extends State<SearchPage> {
+class _SearchPageState extends State<SearchPage> with AutomaticKeepAliveClientMixin {
   SearchMode _searchMode = SearchMode.local;
+
+  @override
+  bool get wantKeepAlive => true;
 
   // Local Search State
   final TextEditingController _localSearchController = TextEditingController();
+  Timer? _localSearchDebounce;
   List<String> _filterTags = <String>[];
   int _minRating = 0;
   bool _showAdvancedFilters = false;
@@ -44,10 +47,18 @@ class _SearchPageState extends State<SearchPage> {
 
   @override
   void dispose() {
+    _localSearchDebounce?.cancel();
     _localSearchController.dispose();
     _mangadexSearchController.dispose();
     _anilistSearchController.dispose();
     super.dispose();
+  }
+
+  void _onLocalSearchChanged(String val) {
+    if (_localSearchDebounce?.isActive ?? false) _localSearchDebounce!.cancel();
+    _localSearchDebounce = Timer(const Duration(milliseconds: 300), () {
+      if (mounted) setState(() {});
+    });
   }
 
   Future<void> _performMangaDexSearch() async {
@@ -157,17 +168,22 @@ class _SearchPageState extends State<SearchPage> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Needed for AutomaticKeepAliveClientMixin
     final MangaCollectionData mangaCollection = context.watch<MangaCollectionData>();
 
-    final List<Manga> filteredLocalMangas = mangaCollection.mangas.where((Manga manga) {
-      final bool matchesText = manga.title.toLowerCase().contains(_localSearchController.text.toLowerCase()) ||
-          manga.altTitles.any((alt) => alt.toLowerCase().contains(_localSearchController.text.toLowerCase()));
-      final bool matchesTags = _filterTags.isEmpty || _filterTags.every((String tag) => manga.themes.contains(tag));
-      final bool matchesRating = manga.rating >= _minRating;
-      final bool matchesStatus = _selectedStatusFilter == null || manga.status == _selectedStatusFilter;
+    final List<Manga> filteredLocalMangas = _searchMode == SearchMode.local
+        ? mangaCollection.mangas.where((Manga manga) {
+            final String query = _localSearchController.text.toLowerCase();
+            final bool matchesText = query.isEmpty ||
+                manga.title.toLowerCase().contains(query) ||
+                manga.altTitles.any((alt) => alt.toLowerCase().contains(query));
+            final bool matchesTags = _filterTags.isEmpty || _filterTags.every((String tag) => manga.themes.contains(tag));
+            final bool matchesRating = manga.rating >= _minRating;
+            final bool matchesStatus = _selectedStatusFilter == null || manga.status == _selectedStatusFilter;
 
-      return matchesText && matchesTags && matchesRating && matchesStatus;
-    }).toList();
+            return matchesText && matchesTags && matchesRating && matchesStatus;
+          }).toList()
+        : [];
 
     return Scaffold(
       appBar: AppBar(
@@ -224,7 +240,7 @@ class _SearchPageState extends State<SearchPage> {
                                   icon: const Icon(Icons.clear),
                                   onPressed: () {
                                     _localSearchController.clear();
-                                    setState(() {});
+                                    _onLocalSearchChanged('');
                                   },
                                 )
                               : null,
@@ -232,7 +248,7 @@ class _SearchPageState extends State<SearchPage> {
                           filled: true,
                           fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withAlpha((255 * 0.3).round()),
                         ),
-                        onChanged: (String val) => setState(() {}),
+                        onChanged: _onLocalSearchChanged,
                       ),
                       const SizedBox(height: 10),
                       SingleChildScrollView(
@@ -311,7 +327,10 @@ class _SearchPageState extends State<SearchPage> {
                               physics: const NeverScrollableScrollPhysics(),
                               itemCount: filteredLocalMangas.length,
                               itemBuilder: (BuildContext context, int index) {
-                                return MangaListTile(manga: filteredLocalMangas[index]);
+                                return MangaListTile(
+                                  key: ValueKey(filteredLocalMangas[index].title),
+                                  manga: filteredLocalMangas[index]
+                                );
                               },
                             ),
                     ],

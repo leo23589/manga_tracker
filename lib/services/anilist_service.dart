@@ -62,6 +62,10 @@ class AniListService {
     }
     return imageUrl;
   }
+  
+  static Map<String, dynamic> _decodeJson(String jsonString) {
+    return jsonDecode(jsonString) as Map<String, dynamic>;
+  }
 
   /// Fetches cover image URL directly by AniList [mediaId].
   static Future<String?> getCoverByMediaId(int mediaId) async {
@@ -89,7 +93,7 @@ class AniListService {
       ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
-        final Map<String, dynamic> body = jsonDecode(response.body);
+        final Map<String, dynamic> body = await compute(_decodeJson, response.body);
         final Map<String, dynamic>? coverMap = body['data']?['Media']?['coverImage'] as Map<String, dynamic>?;
         if (coverMap != null) {
           return coverMap['extraLarge'] as String? ?? coverMap['large'] as String?;
@@ -151,6 +155,80 @@ class AniListService {
 
     return 'Untitled';
   }
+  
+  static List<AniListSearchResult> _parseSearchResults(Map<String, dynamic> body) {
+    final List<dynamic> mediaList = body['data']?['Page']?['media'] ?? <dynamic>[];
+    final List<AniListSearchResult> results = <AniListSearchResult>[];
+
+    for (final dynamic item in mediaList) {
+      if (item is! Map<String, dynamic>) continue;
+
+      final int id = item['id'] as int? ?? 0;
+      final Map<String, dynamic> titleMap = item['title'] as Map<String, dynamic>? ?? {};
+      final dynamic synonyms = item['synonyms'];
+
+      final String english = titleMap['english'] as String? ?? '';
+      final String romaji = titleMap['romaji'] as String? ?? '';
+      final String native = titleMap['native'] as String? ?? '';
+
+      final String primaryTitle = _extractBestEnglishTitle(titleMap, synonyms);
+
+      final List<String> altList = <String>[];
+      if (english.isNotEmpty && english.toLowerCase() != primaryTitle.toLowerCase()) altList.add(english);
+      if (romaji.isNotEmpty && romaji.toLowerCase() != primaryTitle.toLowerCase()) altList.add(romaji);
+      if (native.isNotEmpty && native.toLowerCase() != primaryTitle.toLowerCase()) altList.add(native);
+
+      if (synonyms is List) {
+        for (final dynamic s in synonyms) {
+          if (s != null && s.toString().trim().isNotEmpty) {
+            final String syn = s.toString().trim();
+            if (syn.toLowerCase() != primaryTitle.toLowerCase() && !altList.contains(syn)) {
+              altList.add(syn);
+            }
+          }
+        }
+      }
+
+      String rawSynopsis = item['description'] as String? ?? '';
+      rawSynopsis = rawSynopsis.replaceAll(RegExp(r'<[^>]*>'), '');
+
+      String? coverUrl;
+      final Map<String, dynamic>? coverMap = item['coverImage'] as Map<String, dynamic>?;
+      if (coverMap != null) {
+        coverUrl = coverMap['large'] as String? ?? coverMap['medium'] as String?;
+      }
+
+      final List<String> genresList = <String>[];
+      final dynamic rawGenres = item['genres'];
+      if (rawGenres is List) {
+        for (final dynamic g in rawGenres) {
+          if (g != null && g.toString().isNotEmpty) {
+            genresList.add(g.toString());
+          }
+        }
+      }
+
+      final String? format = item['format'] as String?;
+      if (format != null && format.toUpperCase() == 'MANHWA') {
+        genresList.insert(0, 'Manhwa');
+      } else {
+        genresList.insert(0, 'Manga');
+      }
+
+      if (!genresList.contains('AniList')) genresList.add('AniList');
+
+      results.add(AniListSearchResult(
+        id: id,
+        title: primaryTitle,
+        synopsis: rawSynopsis,
+        coverUrl: coverUrl,
+        tags: genresList,
+        altTitles: altList,
+      ));
+    }
+    
+    return results;
+  }
 
   static Future<List<AniListSearchResult>> searchManga(String query) async {
     if (query.trim().isEmpty) return <AniListSearchResult>[];
@@ -193,79 +271,8 @@ class AniListService {
         return <AniListSearchResult>[];
       }
 
-      final Map<String, dynamic> body = jsonDecode(response.body);
-      final List<dynamic> mediaList = body['data']?['Page']?['media'] ?? <dynamic>[];
-
-      final List<AniListSearchResult> results = <AniListSearchResult>[];
-
-      for (final dynamic item in mediaList) {
-        if (item is! Map<String, dynamic>) continue;
-
-        final int id = item['id'] as int? ?? 0;
-        final Map<String, dynamic> titleMap = item['title'] as Map<String, dynamic>? ?? {};
-        final dynamic synonyms = item['synonyms'];
-
-        final String english = titleMap['english'] as String? ?? '';
-        final String romaji = titleMap['romaji'] as String? ?? '';
-        final String native = titleMap['native'] as String? ?? '';
-
-        final String primaryTitle = _extractBestEnglishTitle(titleMap, synonyms);
-
-        final List<String> altList = <String>[];
-        if (english.isNotEmpty && english.toLowerCase() != primaryTitle.toLowerCase()) altList.add(english);
-        if (romaji.isNotEmpty && romaji.toLowerCase() != primaryTitle.toLowerCase()) altList.add(romaji);
-        if (native.isNotEmpty && native.toLowerCase() != primaryTitle.toLowerCase()) altList.add(native);
-
-        if (synonyms is List) {
-          for (final dynamic s in synonyms) {
-            if (s != null && s.toString().trim().isNotEmpty) {
-              final String syn = s.toString().trim();
-              if (syn.toLowerCase() != primaryTitle.toLowerCase() && !altList.contains(syn)) {
-                altList.add(syn);
-              }
-            }
-          }
-        }
-
-        String rawSynopsis = item['description'] as String? ?? '';
-        rawSynopsis = rawSynopsis.replaceAll(RegExp(r'<[^>]*>'), '');
-
-        String? coverUrl;
-        final Map<String, dynamic>? coverMap = item['coverImage'] as Map<String, dynamic>?;
-        if (coverMap != null) {
-          coverUrl = coverMap['large'] as String? ?? coverMap['medium'] as String?;
-        }
-
-        final List<String> genresList = <String>[];
-        final dynamic rawGenres = item['genres'];
-        if (rawGenres is List) {
-          for (final dynamic g in rawGenres) {
-            if (g != null && g.toString().isNotEmpty) {
-              genresList.add(g.toString());
-            }
-          }
-        }
-
-        final String? format = item['format'] as String?;
-        if (format != null && format.toUpperCase() == 'MANHWA') {
-          genresList.insert(0, 'Manhwa');
-        } else {
-          genresList.insert(0, 'Manga');
-        }
-
-        if (!genresList.contains('AniList')) genresList.add('AniList');
-
-        results.add(AniListSearchResult(
-          id: id,
-          title: primaryTitle,
-          synopsis: rawSynopsis,
-          coverUrl: coverUrl,
-          tags: genresList,
-          altTitles: altList,
-        ));
-      }
-
-      return results;
+      final Map<String, dynamic> body = await compute(_decodeJson, response.body);
+      return await compute(_parseSearchResults, body);
     } catch (e) {
       debugPrint('Error searching AniList: $e');
       return <AniListSearchResult>[];

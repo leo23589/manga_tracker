@@ -76,11 +76,10 @@ class MangaDexService {
     return k == 'en' || k == 'fr' || k == 'ja-ro' || k == 'ko-ro' || k == 'ko';
   }
 
-  /// Downloads a remote cover image URL to local storage so it works 100% offline.
   static Future<String?> downloadCoverImageLocally(String? imageUrl) async {
     if (imageUrl == null || imageUrl.isEmpty) return null;
     if (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://')) {
-      return imageUrl; // Already a local path
+      return imageUrl;
     }
 
     try {
@@ -97,10 +96,13 @@ class MangaDexService {
     } catch (e) {
       debugPrint('Error downloading cover image locally: $e');
     }
-    return imageUrl; // Fallback to URL if download fails
+    return imageUrl;
+  }
+  
+  static Map<String, dynamic> _decodeJson(String jsonString) {
+    return jsonDecode(jsonString) as Map<String, dynamic>;
   }
 
-  /// Searches MangaDex and returns a list of cover art URLs for the matching manga directly using [mangaId] or falling back to [query].
   static Future<List<String>> getMangaCoverUrls({String? mangaId, String? query}) async {
     String? targetId = mangaId;
 
@@ -126,7 +128,7 @@ class MangaDexService {
 
       if (response.statusCode != 200) return <String>[];
 
-      final Map<String, dynamic> body = jsonDecode(response.body);
+      final Map<String, dynamic> body = await compute(_decodeJson, response.body);
       final List<dynamic> data = body['data'] ?? <dynamic>[];
 
       final List<String> coverUrls = <String>[];
@@ -146,8 +148,6 @@ class MangaDexService {
     }
   }
 
-  /// Extracts the preferred English title from MangaDex attributes,
-  /// falling back to Romanized Japanese/Korean or French.
   static String _extractEnglishTitle(Map<String, dynamic> attributes) {
     final dynamic titleObj = attributes['title'];
     if (titleObj is Map && titleObj['en'] != null) {
@@ -183,7 +183,6 @@ class MangaDexService {
     return 'Untitled';
   }
 
-  /// Extracts description from MangaDex attributes.
   static String _extractEnglishSynopsis(Map<String, dynamic> attributes) {
     final dynamic descObj = attributes['description'];
     if (descObj is Map) {
@@ -201,8 +200,106 @@ class MangaDexService {
     }
     return '';
   }
+  
+  static List<MangaDexSearchResult> _parseSearchResults(Map<String, dynamic> body) {
+    final List<dynamic> data = body['data'] ?? <dynamic>[];
+    final List<MangaDexSearchResult> results = <MangaDexSearchResult>[];
 
-  /// Searches MangaDex for manga matching [query] in English/French/Romaji.
+    for (final dynamic item in data) {
+      if (item is! Map<String, dynamic>) continue;
+
+      final String mangaId = item['id'] as String? ?? '';
+      final Map<String, dynamic> attributes = item['attributes'] as Map<String, dynamic>? ?? <String, dynamic>{};
+
+      final String title = _extractEnglishTitle(attributes);
+      final String synopsis = _extractEnglishSynopsis(attributes);
+
+      String? coverUrl;
+      final dynamic relationships = item['relationships'];
+      if (relationships is List) {
+        for (final dynamic rel in relationships) {
+          if (rel is Map && rel['type'] == 'cover_art') {
+            final Map<String, dynamic>? relAttributes = rel['attributes'] as Map<String, dynamic>?;
+            if (relAttributes != null) {
+              final String? fileName = relAttributes['fileName'] as String?;
+              if (fileName != null && fileName.isNotEmpty) {
+                coverUrl = 'https://uploads.mangadex.org/covers/$mangaId/$fileName.256.jpg';
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      final List<String> extractedTags = <String>[];
+      final dynamic tagsList = attributes['tags'];
+      if (tagsList is List) {
+        for (final dynamic tagObj in tagsList) {
+          if (tagObj is Map) {
+            final dynamic tagAttr = tagObj['attributes'];
+            if (tagAttr is Map) {
+              final dynamic tagNameObj = tagAttr['name'];
+              if (tagNameObj is Map) {
+                final String? tagName = tagNameObj['en'] as String?;
+                if (tagName != null) {
+                  final String matchedTag = _matchAppTag(tagName);
+                  if (!extractedTags.contains(matchedTag)) {
+                    extractedTags.add(matchedTag);
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      final String? demographic = attributes['publicationDemographic'] as String?;
+      if (demographic != null && demographic.isNotEmpty) {
+        final String demoCapitalized = demographic[0].toUpperCase() + demographic.substring(1);
+        if (!extractedTags.contains(demoCapitalized)) {
+          extractedTags.add(demoCapitalized);
+        }
+      }
+
+      extractedTags.removeWhere((t) => t.toLowerCase() == 'long strip');
+      if (extractedTags.contains('Manhwa')) {
+        extractedTags.remove('Manga');
+      } else if (!extractedTags.any((t) => AppConstants.content.contains(t))) {
+        extractedTags.insert(0, "Manga");
+      }
+
+      final List<String> altTitlesList = <String>[];
+      final dynamic altObj = attributes['altTitles'];
+      if (altObj is List) {
+        for (final dynamic altMap in altObj) {
+          if (altMap is Map) {
+            for (final MapEntry<dynamic, dynamic> entry in altMap.entries) {
+              final String langKey = entry.key.toString();
+              final String val = entry.value?.toString().trim() ?? '';
+
+              if (_isAllowedLanguageKey(langKey) && val.isNotEmpty && !_hasNonLatinScript(val)) {
+                if (val.toLowerCase() != title.toLowerCase() && !altTitlesList.contains(val)) {
+                  altTitlesList.add(val);
+                }
+              }
+            }
+          }
+        }
+      }
+
+      results.add(MangaDexSearchResult(
+        id: mangaId,
+        title: title,
+        synopsis: synopsis,
+        coverUrl: coverUrl,
+        tags: extractedTags,
+        altTitles: altTitlesList,
+      ));
+    }
+    
+    return results;
+  }
+
   static Future<List<MangaDexSearchResult>> searchManga(String query) async {
     if (query.trim().isEmpty) {
       return <MangaDexSearchResult>[];
@@ -227,104 +324,8 @@ class MangaDexService {
         return <MangaDexSearchResult>[];
       }
 
-      final Map<String, dynamic> body = jsonDecode(response.body);
-      final List<dynamic> data = body['data'] ?? <dynamic>[];
-
-      final List<MangaDexSearchResult> results = <MangaDexSearchResult>[];
-
-      for (final dynamic item in data) {
-        if (item is! Map<String, dynamic>) continue;
-
-        final String mangaId = item['id'] as String? ?? '';
-        final Map<String, dynamic> attributes = item['attributes'] as Map<String, dynamic>? ?? <String, dynamic>{};
-
-        final String title = _extractEnglishTitle(attributes);
-        final String synopsis = _extractEnglishSynopsis(attributes);
-
-        String? coverUrl;
-        final dynamic relationships = item['relationships'];
-        if (relationships is List) {
-          for (final dynamic rel in relationships) {
-            if (rel is Map && rel['type'] == 'cover_art') {
-              final Map<String, dynamic>? relAttributes = rel['attributes'] as Map<String, dynamic>?;
-              if (relAttributes != null) {
-                final String? fileName = relAttributes['fileName'] as String?;
-                if (fileName != null && fileName.isNotEmpty) {
-                  coverUrl = 'https://uploads.mangadex.org/covers/$mangaId/$fileName.256.jpg';
-                  break;
-                }
-              }
-            }
-          }
-        }
-
-        final List<String> extractedTags = <String>[];
-        final dynamic tagsList = attributes['tags'];
-        if (tagsList is List) {
-          for (final dynamic tagObj in tagsList) {
-            if (tagObj is Map) {
-              final dynamic tagAttr = tagObj['attributes'];
-              if (tagAttr is Map) {
-                final dynamic tagNameObj = tagAttr['name'];
-                if (tagNameObj is Map) {
-                  final String? tagName = tagNameObj['en'] as String?;
-                  if (tagName != null) {
-                    final String matchedTag = _matchAppTag(tagName);
-                    if (!extractedTags.contains(matchedTag)) {
-                      extractedTags.add(matchedTag);
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-
-        final String? demographic = attributes['publicationDemographic'] as String?;
-        if (demographic != null && demographic.isNotEmpty) {
-          final String demoCapitalized = demographic[0].toUpperCase() + demographic.substring(1);
-          if (!extractedTags.contains(demoCapitalized)) {
-            extractedTags.add(demoCapitalized);
-          }
-        }
-
-        extractedTags.removeWhere((t) => t.toLowerCase() == 'long strip');
-        if (extractedTags.contains('Manhwa')) {
-          extractedTags.remove('Manga');
-        } else if (!extractedTags.any((t) => AppConstants.content.contains(t))) {
-          extractedTags.insert(0, "Manga");
-        }
-
-        final List<String> altTitlesList = <String>[];
-        final dynamic altObj = attributes['altTitles'];
-        if (altObj is List) {
-          for (final dynamic altMap in altObj) {
-            if (altMap is Map) {
-              for (final MapEntry<dynamic, dynamic> entry in altMap.entries) {
-                final String langKey = entry.key.toString();
-                final String val = entry.value?.toString().trim() ?? '';
-
-                if (_isAllowedLanguageKey(langKey) && val.isNotEmpty && !_hasNonLatinScript(val)) {
-                  if (val.toLowerCase() != title.toLowerCase() && !altTitlesList.contains(val)) {
-                    altTitlesList.add(val);
-                  }
-                }
-              }
-            }
-          }
-        }
-
-        results.add(MangaDexSearchResult(
-          id: mangaId,
-          title: title,
-          synopsis: synopsis,
-          coverUrl: coverUrl,
-          tags: extractedTags,
-          altTitles: altTitlesList,
-        ));
-      }
-
-      return results;
+      final Map<String, dynamic> body = await compute(_decodeJson, response.body);
+      return await compute(_parseSearchResults, body);
     } catch (e) {
       debugPrint('Error searching MangaDex: $e');
       rethrow;
