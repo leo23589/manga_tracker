@@ -8,6 +8,10 @@ class MangaCollectionData extends ChangeNotifier {
   MangaSortOption _sortOption = MangaSortOption.lastAdded;
   List<Manga> _mangas = <Manga>[];
   
+  // Cache the sorted list to prevent expensive sorting 60 times per second during UI animations
+  List<Manga> _sortedMangasCache = <Manga>[];
+  bool _needsSorting = true;
+  
   Timer? _saveDebouncer;
 
   MangaCollectionData() {
@@ -16,33 +20,45 @@ class MangaCollectionData extends ChangeNotifier {
 
   MangaSortOption get sortOption => _sortOption;
   set sortOption(MangaSortOption option) {
-    _sortOption = option;
-    notifyListeners();
+    if (_sortOption != option) {
+      _sortOption = option;
+      _needsSorting = true;
+      notifyListeners();
+    }
   }
 
   List<Manga> get mangas {
-    List<Manga> sortedList = List<Manga>.from(_mangas);
-    switch (_sortOption) {
-      case MangaSortOption.lastAdded:
-        sortedList.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-        break;
-      case MangaSortOption.lastUpdated:
-        sortedList.sort((a, b) => b.lastUpdated.compareTo(a.lastUpdated));
-        break;
-      case MangaSortOption.rating:
-        sortedList.sort((a, b) => b.rating.compareTo(a.rating));
-        break;
-      case MangaSortOption.title:
-        sortedList.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
-        break;
+    if (_needsSorting) {
+      _sortedMangasCache = List<Manga>.from(_mangas);
+      switch (_sortOption) {
+        case MangaSortOption.lastAdded:
+          _sortedMangasCache.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          break;
+        case MangaSortOption.lastUpdated:
+          _sortedMangasCache.sort((a, b) => b.lastUpdated.compareTo(a.lastUpdated));
+          break;
+        case MangaSortOption.rating:
+          _sortedMangasCache.sort((a, b) => b.rating.compareTo(a.rating));
+          break;
+        case MangaSortOption.title:
+          _sortedMangasCache.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+          break;
+      }
+      _needsSorting = false;
     }
-    return sortedList;
+    return _sortedMangasCache;
   }
 
   void _scheduleSave() {
+    // A manga was updated. Invalidate the sort cache so it moves to the correct position (e.g. top of Recently Updated)
+    _needsSorting = true;
+    
     if (_saveDebouncer?.isActive ?? false) _saveDebouncer!.cancel();
     _saveDebouncer = Timer(const Duration(milliseconds: 500), () async {
       await _repository.saveMangas(_mangas);
+      // Notify listeners after the debounced save to smoothly reorder the UI list
+      // This prevents items from jumping around while the user is actively clicking "+"
+      notifyListeners();
     });
   }
   
@@ -66,6 +82,7 @@ class MangaCollectionData extends ChangeNotifier {
       ];
       _scheduleSave();
     }
+    _needsSorting = true;
     notifyListeners();
   }
 
@@ -79,6 +96,7 @@ class MangaCollectionData extends ChangeNotifier {
       for (var manga in _mangas) {
         manga.addListener(_scheduleSave);
       }
+      _needsSorting = true;
       _scheduleSave();
       notifyListeners();
       return true;
@@ -93,6 +111,7 @@ class MangaCollectionData extends ChangeNotifier {
   void addManga(Manga manga) {
     _mangas.add(manga);
     manga.addListener(_scheduleSave);
+    _needsSorting = true;
     _scheduleSave();
     notifyListeners();
   }
@@ -100,6 +119,7 @@ class MangaCollectionData extends ChangeNotifier {
   void deleteManga(Manga manga) {
     manga.removeListener(_scheduleSave);
     _mangas.remove(manga);
+    _needsSorting = true;
     _scheduleSave();
     notifyListeners();
   }
