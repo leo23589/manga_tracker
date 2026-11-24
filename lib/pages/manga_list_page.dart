@@ -1,3 +1,4 @@
+import 'dart:async';
 import '../providers/manga_provider.dart';
 
 import 'package:flutter/material.dart';
@@ -19,14 +20,31 @@ class _MangaListPageState extends State<MangaListPage> with AutomaticKeepAliveCl
   final TextEditingController _searchController = TextEditingController();
   MangaStatus? _statusFilter;
   bool? _linkedFilter;
+  Timer? _searchDebouncer;
+  
+  // Cache the filtered list to prevent freezing on large libraries
+  List<Manga> _filteredListCache = [];
+  bool _needsFilterRecalculation = true;
 
   @override
   bool get wantKeepAlive => true;
 
   @override
   void dispose() {
+    _searchDebouncer?.cancel();
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _onSearchChanged(String val) {
+    if (_searchDebouncer?.isActive ?? false) _searchDebouncer!.cancel();
+    _searchDebouncer = Timer(const Duration(milliseconds: 250), () {
+      if (mounted) {
+        setState(() {
+          _needsFilterRecalculation = true;
+        });
+      }
+    });
   }
 
   void _showActivityLogsSheet(BuildContext context, ExtensionServerService serverService) {
@@ -133,16 +151,10 @@ class _MangaListPageState extends State<MangaListPage> with AutomaticKeepAliveCl
     if (diff.inHours < 24) return "${diff.inHours}h ago";
     return "${diff.inDays}d ago";
   }
-
-  @override
-  Widget build(BuildContext context) {
-    super.build(context);
-
-    final MangaCollectionData mangaCollection = context.watch<MangaCollectionData>();
-    final ExtensionServerService serverService = context.watch<ExtensionServerService>();
-
-    final List<Manga> filteredList = mangaCollection.mangas.where((manga) {
-      final query = _searchController.text.toLowerCase();
+  
+  void _updateFilteredCache(List<Manga> allMangas) {
+    final query = _searchController.text.toLowerCase();
+    _filteredListCache = allMangas.where((manga) {
       final matchesSearch = query.isEmpty ||
           manga.title.toLowerCase().contains(query) ||
           manga.altTitles.any((alt) => alt.toLowerCase().contains(query));
@@ -152,6 +164,19 @@ class _MangaListPageState extends State<MangaListPage> with AutomaticKeepAliveCl
           (_linkedFilter == false && !manga.isLinked);
       return matchesSearch && matchesStatus && matchesLink;
     }).toList();
+    _needsFilterRecalculation = false;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+
+    final MangaCollectionData mangaCollection = context.watch<MangaCollectionData>();
+    final ExtensionServerService serverService = context.watch<ExtensionServerService>();
+
+    if (_needsFilterRecalculation || _filteredListCache.length != mangaCollection.mangas.length) {
+      _updateFilteredCache(mangaCollection.mangas);
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -171,7 +196,13 @@ class _MangaListPageState extends State<MangaListPage> with AutomaticKeepAliveCl
           PopupMenuButton<MangaSortOption>(
             icon: const Icon(Icons.sort),
             onSelected: (MangaSortOption option) {
-              mangaCollection.sortOption = option;
+              // Delay sorting state update to allow smooth popup dismissal animation
+              Future.delayed(const Duration(milliseconds: 150), () {
+                if (mounted) {
+                  mangaCollection.sortOption = option;
+                  setState(() => _needsFilterRecalculation = true);
+                }
+              });
             },
             itemBuilder: (BuildContext context) => <PopupMenuEntry<MangaSortOption>>[
               const PopupMenuItem<MangaSortOption>(
@@ -216,7 +247,7 @@ class _MangaListPageState extends State<MangaListPage> with AutomaticKeepAliveCl
                         icon: const Icon(Icons.clear),
                         onPressed: () {
                           _searchController.clear();
-                          setState(() {});
+                          _onSearchChanged('');
                         },
                       )
                     : null,
@@ -225,7 +256,7 @@ class _MangaListPageState extends State<MangaListPage> with AutomaticKeepAliveCl
                 fillColor: const Color(0xFF1E1E28),
                 isDense: true,
               ),
-              onChanged: (_) => setState(() {}),
+              onChanged: _onSearchChanged,
             ),
           ),
 
@@ -241,6 +272,7 @@ class _MangaListPageState extends State<MangaListPage> with AutomaticKeepAliveCl
                   onSelected: (_) => setState(() {
                     _statusFilter = null;
                     _linkedFilter = null;
+                    _needsFilterRecalculation = true;
                   }),
                 ),
                 const SizedBox(width: 8),
@@ -252,6 +284,7 @@ class _MangaListPageState extends State<MangaListPage> with AutomaticKeepAliveCl
                   onSelected: (selected) {
                     setState(() {
                       _linkedFilter = selected ? true : null;
+                      _needsFilterRecalculation = true;
                     });
                   },
                 ),
@@ -264,6 +297,7 @@ class _MangaListPageState extends State<MangaListPage> with AutomaticKeepAliveCl
                   onSelected: (selected) {
                     setState(() {
                       _linkedFilter = selected ? false : null;
+                      _needsFilterRecalculation = true;
                     });
                   },
                 ),
@@ -282,6 +316,7 @@ class _MangaListPageState extends State<MangaListPage> with AutomaticKeepAliveCl
                       onSelected: (selected) {
                         setState(() {
                           _statusFilter = selected ? status : null;
+                          _needsFilterRecalculation = true;
                         });
                       },
                     ),
@@ -293,7 +328,7 @@ class _MangaListPageState extends State<MangaListPage> with AutomaticKeepAliveCl
           const Divider(height: 1),
 
           Expanded(
-            child: filteredList.isEmpty
+            child: _filteredListCache.isEmpty
                 ? Center(
                     child: Text(
                       _searchController.text.isNotEmpty || _statusFilter != null || _linkedFilter != null
@@ -303,12 +338,12 @@ class _MangaListPageState extends State<MangaListPage> with AutomaticKeepAliveCl
                     ),
                   )
                 : ListView.builder(
-                    itemCount: filteredList.length,
+                    itemCount: _filteredListCache.length,
                     padding: const EdgeInsets.all(10),
                     itemBuilder: (BuildContext context, int index) {
                       return MangaListTile(
-                        key: ValueKey(filteredList[index].title + filteredList[index].createdAt.toString()),
-                        manga: filteredList[index],
+                        key: ObjectKey(_filteredListCache[index]),
+                        manga: _filteredListCache[index],
                       );
                     },
                   ),
